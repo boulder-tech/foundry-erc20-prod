@@ -5,7 +5,7 @@ import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils
 import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import { BTtokens } from "./BTtokens.sol";
+// import { BTtokens } from "./BTtokens.sol";
 
 /**
  * @dev
@@ -37,7 +37,7 @@ contract BTtokensEngine is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     /// @dev Array to keep track of deployed tokens
     mapping(bytes32 => address) public s_deployedTokens;
 
-    BTtokens public s_tokenImplementation;
+    address public s_tokenImplementationAddress;
     bool public s_initialized;
 
     //////////////////
@@ -49,7 +49,7 @@ contract BTtokensEngine is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     event UnBlacklisted(address indexed user);
 
     event NewToken(address indexed newToken, string name, string symbol);
-    event NewImplementation(address indexed newImplementation);
+    event NewTokenImplementationSet(address indexed newTokenImplementation);
 
     ///////////////////
     //   Modifiers  ///
@@ -93,10 +93,19 @@ contract BTtokensEngine is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         _disableInitializers();
     }
 
-    function initialize(address initialOwner) public initializer notInitialized nonZeroAddress(initialOwner) {
+    function initialize(
+        address initialOwner,
+        address tokenImplementationAddress
+    )
+        public
+        initializer
+        notInitialized
+        nonZeroAddress(initialOwner)
+        nonZeroAddress(tokenImplementationAddress)
+    {
         __Ownable_init(initialOwner);
         __UUPSUpgradeable_init();
-        s_tokenImplementation = new BTtokens();
+        s_tokenImplementationAddress = tokenImplementationAddress;
         s_initialized = true;
     }
 
@@ -125,7 +134,7 @@ contract BTtokensEngine is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         bytes32 salt = keccak256(abi.encodePacked(tokenName, tokenSymbol));
 
         BTtokenProxy newProxyToken = new BTtokenProxy{ salt: salt }(
-            address(s_tokenImplementation), abi.encodeWithSignature("initialize(bytes)", data)
+            address(s_tokenImplementationAddress), abi.encodeWithSignature("initialize(bytes)", data)
         );
 
         s_deployedTokens[salt] = address(newProxyToken);
@@ -154,6 +163,16 @@ contract BTtokensEngine is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 
     function isBlacklisted(address _account) external view returns (bool) {
         return _isBlacklisted(_account);
+    }
+
+    function setNewTokenImplementationAddress(address newImplementationAddress)
+        external
+        onlyOwner
+        nonZeroAddress(newImplementationAddress)
+        notInitialized
+    {
+        s_tokenImplementationAddress = newImplementationAddress;
+        emit NewTokenImplementationSet(s_tokenImplementationAddress);
     }
 
     /////////////////////////

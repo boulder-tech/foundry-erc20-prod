@@ -4,22 +4,24 @@ pragma solidity ^0.8.18;
 import { Test, console, console2 } from "forge-std/Test.sol";
 import { DeployEngine } from "../script/DeployEngine.s.sol";
 // import {UpgradeBox} from "../script/UpgradeBox.s.sol";
-import { BTtokensEngine, BTtokens } from "../src/BTtokensEngine.sol";
+import { BTtokensEngine } from "../src/BTtokensEngine.sol";
+import { BTtokens } from "../src/BTtokens.sol";
 // import {BoxV2} from "../src/BoxV2.sol";
 
 contract DeployAndUpgradeTest is Test {
-    DeployEngine public deployer;
+    DeployEngine public engineDeployer;
     // UpgradeBox public upgrader;
     address public engineProxy;
+    address public tokenImplementationAddress;
 
     function setUp() public {
-        deployer = new DeployEngine();
+        engineDeployer = new DeployEngine();
         // upgrader = new UpgradeBox();
-        engineProxy = deployer.run(); // right now, points to boxV1
+        (engineProxy, tokenImplementationAddress) = engineDeployer.run(); //
     }
 
     function testDeployedBTtokensEngine() public {
-        BTtokensEngine(engineProxy).initialize(address(this));
+        BTtokensEngine(engineProxy).initialize(address(this), tokenImplementationAddress);
         bool isInitialized = BTtokensEngine(engineProxy).s_initialized();
         assertEq(isInitialized, true);
     }
