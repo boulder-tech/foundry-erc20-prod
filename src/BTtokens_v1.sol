@@ -9,9 +9,9 @@ import { ERC20PausableUpgradeable } from
 import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { Blacklistable } from "./Blacklistable.sol";
-import { BTtokensEngine } from "./BTtokensEngine.sol";
+import { BTtokensEngine_v1 } from "./BTtokensEngine_v1.sol";
 
-contract BTtokens is
+contract BTtokens_v1 is
     UUPSUpgradeable,
     ERC20Upgradeable,
     AccessManagedUpgradeable,
@@ -19,7 +19,7 @@ contract BTtokens is
     ERC20PausableUpgradeable
 {
     // Variables
-    address private i_engine;
+    address private s_engine;
     address private i_manager;
     string i_name;
     string i_symbol;
@@ -54,7 +54,7 @@ contract BTtokens is
         __AccessManaged_init(tokenManager);
         __Ownable_init(owner);
         __ERC20Pausable_init();
-        i_engine = engine;
+        s_engine = engine;
         i_manager = tokenManager;
         i_name = tokenName;
         i_symbol = tokenSymbol;
@@ -81,8 +81,9 @@ contract BTtokens is
      * @param _amount The amount of tokens to mint.
      */
     function mint(address _account, uint256 _amount) public whenNotPaused restricted {
-        if (!BTtokensEngine(i_engine).isBlacklisted(_account)) {
+        if (!BTtokensEngine_v1(s_engine).isBlacklisted(_account)) {
             _mint(_account, _amount);
+            /// ver revert
         }
     }
 

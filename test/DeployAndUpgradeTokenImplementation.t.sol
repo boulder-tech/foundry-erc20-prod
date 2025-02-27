@@ -4,8 +4,9 @@ pragma solidity ^0.8.18;
 import { Test, console, console2 } from "forge-std/Test.sol";
 import { DeployEngine } from "../script/DeployEngine.s.sol";
 // import {UpgradeBox} from "../script/UpgradeBox.s.sol";
-import { BTtokensEngine } from "../src/BTtokensEngine.sol";
-import { BTtokens } from "../src/BTtokens.sol";
+import { BTtokensEngine_v1 } from "../src/BTtokensEngine_v1.sol";
+import { BTtokens_v1 } from "../src/BTtokens_v1.sol";
+import { BTtokensManager } from "../src/BTtokensManager.sol";
 // import {BoxV2} from "../src/BoxV2.sol";
 
 contract DeployAndUpgradeTest is Test {
@@ -13,31 +14,49 @@ contract DeployAndUpgradeTest is Test {
     // UpgradeBox public upgrader;
     address public engineProxy;
     address public tokenImplementationAddress;
+    address public tokenManagerAddress;
+    address public accessManagerAddress;
+
+    address initialAdmin = makeAddr("initialAdmin");
+    address agent = makeAddr("agent");
+
+    uint64 public constant ADMIN_ROLE = type(uint64).min;
+    uint64 public constant AGENT = 10; // Roles are uint64 (0 is reserved for the ADMIN_ROLE)
 
     function setUp() public {
         engineDeployer = new DeployEngine();
         // upgrader = new UpgradeBox();
-        (engineProxy, tokenImplementationAddress) = engineDeployer.run(); //
+        (engineProxy, tokenImplementationAddress, tokenManagerAddress) = engineDeployer.run(initialAdmin); //
+        vm.startPrank(initialAdmin);
+        BTtokensManager c_manager = BTtokensManager(tokenManagerAddress);
+        c_manager.grantRole(ADMIN_ROLE, address(engineProxy), 0);
+        vm.stopPrank();
+        BTtokensEngine_v1(engineProxy).initialize(address(this), tokenImplementationAddress, tokenManagerAddress);
     }
 
-    function testDeployedBTtokensEngine() public {
-        BTtokensEngine(engineProxy).initialize(address(this), tokenImplementationAddress);
-        bool isInitialized = BTtokensEngine(engineProxy).s_initialized();
+    function testDeployedBTtokensEngineInitialization() public {
+        bool isInitialized = BTtokensEngine_v1(engineProxy).s_initialized();
         assertEq(isInitialized, true);
     }
 
-    // function testDeployBTtoken() public {
-    //     string memory tokenName = "BoulderTestToken";
-    //     string memory tokenSymbol = "BTT";
-    //     address tokenManager = address(0);
-    //     address tokenOwner = engineProxy;
-    //     uint8 tokenDecimals = 6;
+    function testDeployBTtoken() public {
+        string memory tokenName = "BoulderTestToken";
+        string memory tokenSymbol = "BTT";
+        address tokenManager = address(0);
+        address tokenOwner = initialAdmin;
+        uint8 tokenDecimals = 6;
 
-    //     bytes memory data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenName, tokenSymbol, tokenDecimals);
+        bytes memory data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenName, tokenSymbol, tokenDecimals);
 
-    //     address newProxyToken = BTtokensEngine(engineProxy).createToken(tokenName, tokenSymbol, data);
+        vm.expectEmit(true, true, true, true, address(engineProxy));
+        // emit BTtokensEngine_v1.TokenCreated(address(0), tokenName, tokenSymbol);
 
-    //     vm.expectEmit(address(engineProxy));
-    //     emit TokenCreated(address(newProxyToken), tokenName, tokenSymbol);
-    // }
+        address newProxyToken = BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
+
+        console.log("token proxy address: ", newProxyToken);
+
+        emit BTtokensEngine_v1.TokenCreated(address(address(newProxyToken)), tokenName, tokenSymbol);
+    }
+
+    // emit TargetFunctionRoleUpdated(target, selector, roleId);
 }
