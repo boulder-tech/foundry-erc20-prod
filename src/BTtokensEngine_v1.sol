@@ -255,7 +255,7 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
         /// @dev clean selectors bytes4 array
         delete s_selectors;
         /// @dev push the bytes4 selector to s_selector
-        s_selectors.push(MINT_4_BYTES); // Agregar el selector de la función
+        s_selectors.push(MINT_4_BYTES);
 
         c_manager.setTargetFunctionRole(tokenProxyAddress, s_selectors, AGENT);
     }
