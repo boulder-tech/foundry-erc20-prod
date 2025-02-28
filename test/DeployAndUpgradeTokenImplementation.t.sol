@@ -39,7 +39,7 @@ contract DeployAndUpgradeTest is Test {
         assertEq(isInitialized, true);
     }
 
-    function testDeployBTtoken() public {
+    function testDeployBTtokenAndSetRoles() public {
         string memory tokenName = "BoulderTestToken";
         string memory tokenSymbol = "BTT";
         address tokenManager = address(0);
@@ -48,15 +48,10 @@ contract DeployAndUpgradeTest is Test {
 
         bytes memory data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenName, tokenSymbol, tokenDecimals);
 
-        vm.expectEmit(true, true, true, true, address(engineProxy));
-        // emit BTtokensEngine_v1.TokenCreated(address(0), tokenName, tokenSymbol);
+        vm.expectEmit(true, false, true, true, address(engineProxy));
+        emit BTtokensEngine_v1.TokenCreated(address(engineProxy), address(0), tokenName, tokenSymbol);
 
-        address newProxyToken = BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
-
-        console.log("token proxy address: ", newProxyToken);
-
-        emit BTtokensEngine_v1.TokenCreated(address(address(newProxyToken)), tokenName, tokenSymbol);
+        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
     }
-
     // emit TargetFunctionRoleUpdated(target, selector, roleId);
 }

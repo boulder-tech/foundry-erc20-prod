@@ -25,6 +25,8 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
     error BTtokensEngine__AddressCanNotBeZero();
     error BTtokensEngine__AccountIsBlacklisted();
     error BTtokensEngine__TokenNameAndSymbolAlreadyInUsed();
+    error BTtokensEngine__EnginePaused();
+    error BTtokensEngine__EngineNotPaused();
 
     ///////////////////
     //     Types    ///
@@ -42,16 +44,24 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
     address public s_tokenImplementationAddress;
     address public s_accessManagerAddress;
     bool public s_initialized;
+    bool public s_enginePaused = true;
     bytes32[] public s_deployedTokensKeys;
     bytes4[] public s_selectors;
     uint64 public constant AGENT = 10; // Roles are uint64 (0 is reserved for the ADMIN_ROLE)
+    uint64 public constant PAUSER = 11;
+
+    /// @dev Using `constant` saves gas by computing the function selector at compile time
+    ///      instead of during contract execution.
     bytes4 public constant MINT_4_BYTES = bytes4(keccak256("mint(address,uint256)"));
+    bytes4 public constant BURN_4_BYTES = bytes4(keccak256("burn(address,uint256)"));
+    bytes4 public constant PAUSE_4_BYTES = bytes4(keccak256("pauseToken()"));
+    bytes4 public constant UNPAUSE_4_BYTES = bytes4(keccak256("unPauseToken()"));
 
     //////////////////
     //    Events   ///
     //////////////////
 
-    event TokenCreated(address indexed tokenProxyAddress, string name, string symbol);
+    event TokenCreated(address indexed engine, address indexed tokenProxyAddress, string name, string symbol);
     event Blacklisted(address indexed user);
     event UnBlacklisted(address indexed user);
     event NewTokenImplementationSet(address indexed newTokenImplementation);
@@ -89,6 +99,20 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
         _;
     }
 
+    modifier whenNotEnginePaused() {
+        if (s_enginePaused) {
+            revert BTtokensEngine__EnginePaused();
+        }
+        _;
+    }
+
+    modifier whenEnginePaused() {
+        if (!s_enginePaused) {
+            revert BTtokensEngine__EngineNotPaused();
+        }
+        _;
+    }
+
     ///////////////////
     //   Functions  ///
     ///////////////////
@@ -115,6 +139,7 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
         s_tokenImplementationAddress = tokenImplementationAddress;
         s_accessManagerAddress = accessManagerAddress;
         s_initialized = true;
+        s_enginePaused = false;
     }
 
     /////////////////////////
@@ -150,12 +175,15 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
         s_deployedTokensKeys.push(salt);
 
         _setMinterRole(address(newProxyToken), agent);
+        _setBurnerRole(address(newProxyToken), agent);
+        _setPauserRole(address(newProxyToken), address(this));
+        _setUnPauserRole(address(newProxyToken), address(this));
 
-        console2.log("TokenCreated: ", address(newProxyToken), tokenName, tokenSymbol);
-
-        emit TokenCreated(address(newProxyToken), tokenName, tokenSymbol);
+        emit TokenCreated(address(this), address(newProxyToken), tokenName, tokenSymbol);
         return address(newProxyToken);
     }
+
+    ///////// Blacklist functions /////////
 
     /**
      * @notice Adds account to blacklist.
@@ -178,6 +206,23 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
     function isBlacklisted(address _account) external view returns (bool) {
         return _isBlacklisted(_account);
     }
+
+    ///////// Blacklist functions /////////
+    /////////   Pause functions   /////////
+
+    /**
+     * @notice Function to pause the engine, could be usefull when upgrading.
+     */
+    function pauseEngine() external onlyOwner whenNotEnginePaused {
+        _pauseEngine();
+    }
+
+    function unPauseEngine() external onlyOwner whenEnginePaused {
+        _unPauseEngine();
+    }
+
+    /////////   Pause functions   /////////
+    /////////   Admin functions   /////////
 
     /**
      * @notice This function sets a new token implementation address. Once set all tokens deployed by this engine will
@@ -206,7 +251,7 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
     /**
      * @notice This function will be helpfull when upgrading token contracts if token implementation address is updated.
      */
-    function getDeployedTokenKeys() external view returns (bytes32[] memory) {
+    function getDeployedTokensKeys() external view returns (bytes32[] memory) {
         return s_deployedTokensKeys;
     }
 
@@ -222,7 +267,7 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
     // Internal Functions ///
     /////////////////////////
 
-    /// Blacklist functions
+    ///////// Blacklist functions /////////
 
     function _blacklist(address _account) internal {
         _setBlacklistState(_account, true);
@@ -241,24 +286,73 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
         s_blacklist[_account] = _shouldBlacklist;
     }
 
-    function _isBlacklisted(address _account) internal view virtual onlyOwner returns (bool) {
+    function _isBlacklisted(address _account) internal view virtual returns (bool) {
         return s_blacklist[_account];
     }
 
-    /// Set roles functions
+    ///////// Blacklist functions /////////
+    /////////   Pause functions   /////////
+
+    function _pauseEngine() internal {
+        s_enginePaused = true;
+    }
+
+    function _unPauseEngine() internal {
+        s_enginePaused = false;
+    }
+
+    /////////   Pause functions   /////////
+    ///////// Set roles functions /////////
 
     function _setMinterRole(address tokenProxyAddress, address agent) internal {
         // Grant the agent role with no execution delay
         BTtokensManager c_manager = BTtokensManager(s_accessManagerAddress);
         c_manager.grantRole(AGENT, agent, 0);
 
-        /// @dev clean selectors bytes4 array
-        delete s_selectors;
-        /// @dev push the bytes4 selector to s_selector
-        s_selectors.push(MINT_4_BYTES);
+        _cleanAndPushSelector4Bytes(MINT_4_BYTES);
 
         c_manager.setTargetFunctionRole(tokenProxyAddress, s_selectors, AGENT);
     }
+
+    function _setBurnerRole(address tokenProxyAddress, address agent) internal {
+        // Grant the agent role with no execution delay
+        BTtokensManager c_manager = BTtokensManager(s_accessManagerAddress);
+        c_manager.grantRole(AGENT, agent, 0);
+
+        _cleanAndPushSelector4Bytes(BURN_4_BYTES);
+
+        c_manager.setTargetFunctionRole(tokenProxyAddress, s_selectors, AGENT);
+    }
+
+    function _setPauserRole(address tokenProxyAddress, address pauser) internal {
+        // Grant the agent role with no execution delay
+        BTtokensManager c_manager = BTtokensManager(s_accessManagerAddress);
+        c_manager.grantRole(PAUSER, pauser, 0);
+
+        _cleanAndPushSelector4Bytes(PAUSE_4_BYTES);
+
+        c_manager.setTargetFunctionRole(tokenProxyAddress, s_selectors, PAUSER);
+    }
+
+    function _setUnPauserRole(address tokenProxyAddress, address pauser) internal {
+        // Grant the agent role with no execution delay
+        BTtokensManager c_manager = BTtokensManager(s_accessManagerAddress);
+        c_manager.grantRole(PAUSER, pauser, 0);
+
+        _cleanAndPushSelector4Bytes(UNPAUSE_4_BYTES);
+
+        c_manager.setTargetFunctionRole(tokenProxyAddress, s_selectors, PAUSER);
+    }
+
+    function _cleanAndPushSelector4Bytes(bytes4 selector) internal {
+        /// @dev clean selectors bytes4 array
+        delete s_selectors;
+        /// @dev push the bytes4 selector to s_selector
+        s_selectors.push(selector);
+    }
+
+    ///////// Set roles functions /////////
+    /////////  Upgrade functions  /////////
 
     function _authorizeUpgrade(address _newImplementation) internal override onlyOwner { }
 
