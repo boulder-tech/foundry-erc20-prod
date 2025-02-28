@@ -8,24 +8,56 @@ import { ERC20PausableUpgradeable } from
     "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PausableUpgradeable.sol";
 import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import { Blacklistable } from "./Blacklistable.sol";
+import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import { BTtokensEngine_v1 } from "./BTtokensEngine_v1.sol";
 
 contract BTtokens_v1 is
     UUPSUpgradeable,
     ERC20Upgradeable,
     AccessManagedUpgradeable,
-    Blacklistable,
-    ERC20PausableUpgradeable
+    ERC20PausableUpgradeable,
+    OwnableUpgradeable
 {
-    // Variables
+    ///////////////////
+    //    Errors    ///
+    ///////////////////
+    error BTtokens__AccountIsBlacklisted();
+    error BTtokens__AccountIsNotBlacklisted();
+
+    ///////////////////
+    //     Types    ///
+    ///////////////////
+
+    //////////////////////
+    // State Variables ///
+    //////////////////////
+
     address private s_engine;
-    address private i_manager;
-    string i_name;
-    string i_symbol;
-    uint8 i_decimals;
+    address private s_manager;
+    string s_name;
+    string s_symbol;
+    uint8 s_decimals;
     bool s_initialized;
     bool s_isPaused;
+
+    //////////////////
+    //    Events   ///
+    //////////////////
+
+    ///////////////////
+    //   Modifiers  ///
+    ///////////////////
+
+    modifier notBlacklisted(address account) {
+        if (BTtokensEngine_v1(s_engine).isBlacklisted(account)) {
+            revert BTtokens__AccountIsBlacklisted();
+        }
+        _;
+    }
+
+    ///////////////////
+    //   Functions  ///
+    ///////////////////
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -55,25 +87,17 @@ contract BTtokens_v1 is
         __Ownable_init(owner);
         __ERC20Pausable_init();
         s_engine = engine;
-        i_manager = tokenManager;
-        i_name = tokenName;
-        i_symbol = tokenSymbol;
-        i_decimals = tokenDecimals;
+        s_manager = tokenManager;
+        s_name = tokenName;
+        s_symbol = tokenSymbol;
+        s_decimals = tokenDecimals;
         s_initialized = true;
         s_isPaused = false;
     }
 
-    function decimals() public view virtual override returns (uint8) {
-        return i_decimals;
-    }
-
-    function initialized() public view virtual returns (bool) {
-        return s_initialized;
-    }
-
-    function isPaused() public view returns (bool) {
-        return s_isPaused;
-    }
+    /////////////////////////
+    // External Functions ///
+    /////////////////////////
 
     /**
      * @notice Mint tokens to the desired account.
@@ -83,7 +107,8 @@ contract BTtokens_v1 is
     function mint(address _account, uint256 _amount) public whenNotPaused restricted {
         if (!BTtokensEngine_v1(s_engine).isBlacklisted(_account)) {
             _mint(_account, _amount);
-            /// ver revert
+        } else {
+            revert BTtokens__AccountIsBlacklisted();
         }
     }
 
@@ -93,27 +118,31 @@ contract BTtokens_v1 is
      * @param _amount The amount of tokens to burn.
      */
     function burn(address _account, uint256 _amount) public restricted {
-        if (_isBlacklisted(_account)) {
+        if (BTtokensEngine_v1(s_engine).isBlacklisted(_account)) {
             _burn(_account, _amount);
+        } else {
+            revert BTtokens__AccountIsNotBlacklisted();
         }
     }
 
-    /**
-     * @notice Adds account to blacklist.
-     * @param _account The address to blacklist.
-     */
-    function blacklist(address _account) external restricted {
-        _blacklist(_account);
-        emit Blacklisted(_account);
+    function decimals() public view virtual override returns (uint8) {
+        return s_decimals;
     }
 
-    /**
-     * @notice Removes account from blacklist.
-     * @param _account The address to remove from the blacklist.
-     */
-    function unBlacklist(address _account) external restricted {
-        _unBlacklist(_account);
-        emit UnBlacklisted(_account);
+    function name() public view virtual override returns (string memory) {
+        return s_name;
+    }
+
+    function symbol() public view virtual override returns (string memory) {
+        return s_symbol;
+    }
+
+    function initialized() public view virtual returns (bool) {
+        return s_initialized;
+    }
+
+    function isPaused() public view returns (bool) {
+        return s_isPaused;
     }
 
     /**
@@ -133,37 +162,7 @@ contract BTtokens_v1 is
     }
 
     /**
-     * @inheritdoc Blacklistable
-     */
-    function _blacklist(address _account) internal override {
-        _setBlacklistState(_account, true);
-    }
-
-    /**
-     * @inheritdoc Blacklistable
-     */
-    function _unBlacklist(address _account) internal override {
-        _setBlacklistState(_account, false);
-    }
-
-    /**
-     * @dev Helper method that sets the blacklist state of an account.
-     * @param _account         The address of the account.
-     * @param _shouldBlacklist True if the account should be blacklisted, false if the account should be unblacklisted.
-     */
-    function _setBlacklistState(address _account, bool _shouldBlacklist) internal virtual {
-        _deprecatedBlacklisted[_account] = _shouldBlacklist;
-    }
-
-    /**
-     * @inheritdoc Blacklistable
-     */
-    function _isBlacklisted(address _account) internal view virtual override returns (bool) {
-        return _deprecatedBlacklisted[_account];
-    }
-
-    /**
-     * @notice Sets a fiat token allowance for a spender to spend on behalf of the caller.
+     * @notice Sets a token allowance for a spender to spend on behalf of the caller.
      * @param spender The spender's address.
      * @param value   The allowance amount.
      * @return True if the operation was successful.
@@ -236,6 +235,10 @@ contract BTtokens_v1 is
         _transfer(owner, to, value);
         return true;
     }
+
+    /////////////////////////
+    // Internal Functions ///
+    /////////////////////////
 
     function _update(
         address from,
