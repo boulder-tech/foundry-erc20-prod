@@ -47,7 +47,8 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
     bool public s_enginePaused = true;
     bytes32[] public s_deployedTokensKeys;
     bytes4[] public s_selectors;
-    uint64 public constant AGENT = 10; // Roles are uint64 (0 is reserved for the ADMIN_ROLE)
+    // Roles are uint64 (0 is reserved for the ADMIN_ROLE)
+    uint64 public constant AGENT = 10;
     uint64 public constant PAUSER = 11;
 
     /// @dev Using `constant` saves gas by computing the function selector at compile time
@@ -65,17 +66,14 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
     event Blacklisted(address indexed user);
     event UnBlacklisted(address indexed user);
     event NewTokenImplementationSet(address indexed newTokenImplementation);
+    event MinterRoleSet(address indexed tokenProxyAddress, address indexed agent);
+    event BurnerRoleSet(address indexed tokenProxyAddress, address indexed agent);
+    event PauserRoleSet(address indexed tokenProxyAddress, address indexed pauser);
+    event UnPauserRoleSet(address indexed tokenProxyAddress, address indexed pauser);
 
     ///////////////////
     //   Modifiers  ///
     ///////////////////
-
-    modifier notInitialized() {
-        if (s_initialized) {
-            revert BTtokensEngine__EngineShouldNotBeInitialized();
-        }
-        _;
-    }
 
     modifier nonZeroAddress(address addr) {
         if (addr == address(0)) {
@@ -129,7 +127,6 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
     )
         public
         initializer
-        notInitialized
         nonZeroAddress(initialOwner)
         nonZeroAddress(tokenImplementationAddress)
         nonZeroAddress(accessManagerAddress)
@@ -312,6 +309,7 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
         _cleanAndPushSelector4Bytes(MINT_4_BYTES);
 
         c_manager.setTargetFunctionRole(tokenProxyAddress, s_selectors, AGENT);
+        emit MinterRoleSet(tokenProxyAddress, agent);
     }
 
     function _setBurnerRole(address tokenProxyAddress, address agent) internal {
@@ -322,6 +320,7 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
         _cleanAndPushSelector4Bytes(BURN_4_BYTES);
 
         c_manager.setTargetFunctionRole(tokenProxyAddress, s_selectors, AGENT);
+        emit BurnerRoleSet(tokenProxyAddress, agent);
     }
 
     function _setPauserRole(address tokenProxyAddress, address pauser) internal {
@@ -332,6 +331,7 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
         _cleanAndPushSelector4Bytes(PAUSE_4_BYTES);
 
         c_manager.setTargetFunctionRole(tokenProxyAddress, s_selectors, PAUSER);
+        emit PauserRoleSet(tokenProxyAddress, pauser);
     }
 
     function _setUnPauserRole(address tokenProxyAddress, address pauser) internal {
@@ -342,6 +342,7 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
         _cleanAndPushSelector4Bytes(UNPAUSE_4_BYTES);
 
         c_manager.setTargetFunctionRole(tokenProxyAddress, s_selectors, PAUSER);
+        emit UnPauserRoleSet(tokenProxyAddress, pauser);
     }
 
     function _cleanAndPushSelector4Bytes(bytes4 selector) internal {
@@ -354,7 +355,15 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
     ///////// Set roles functions /////////
     /////////  Upgrade functions  /////////
 
+    /**
+     * @dev Function that authorizes the upgrade of the contract to a new implementation.     *
+     * can authorize an upgrade to a new implementation contract.
+     * @param _newImplementation The address of the new implementation contract.
+     */
     function _authorizeUpgrade(address _newImplementation) internal override onlyOwner { }
 
+    /**
+     * @dev Reserved storage space to allow for layout changes in the future. uint256[50] __gap;
+     */
     uint256[50] __gap;
 }
