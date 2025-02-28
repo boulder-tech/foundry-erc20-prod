@@ -11,6 +11,15 @@ import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils
 import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import { BTtokensEngine_v1 } from "./BTtokensEngine_v1.sol";
 
+/**
+ * @title BTtokens_v1, BoulderTech Product Tokens
+ * @author BoulderTech Labs
+ * @notice This contract implements an ERC20 token with access management,
+ *         pausability, and upgradeability through a UUPS proxy.
+ *         It enforces blacklist controls and administrative permissions
+ *         to ensure secure and regulated usage within the BoulderTech ecosystem.
+ *         The token can be paused, minted, and burned under specific restrictions.
+ */
 contract BTtokens_v1 is
     UUPSUpgradeable,
     ERC20Upgradeable,
@@ -39,6 +48,7 @@ contract BTtokens_v1 is
     uint8 s_decimals;
     bool s_initialized;
     bool s_isPaused;
+    BTtokensEngine_v1 c_engine;
 
     //////////////////
     //    Events   ///
@@ -93,6 +103,7 @@ contract BTtokens_v1 is
         s_decimals = tokenDecimals;
         s_initialized = true;
         s_isPaused = false;
+        c_engine = BTtokensEngine_v1(s_engine);
     }
 
     /////////////////////////
@@ -105,7 +116,7 @@ contract BTtokens_v1 is
      * @param _amount The amount of tokens to mint.
      */
     function mint(address _account, uint256 _amount) public whenNotPaused restricted {
-        if (!BTtokensEngine_v1(s_engine).isBlacklisted(_account)) {
+        if (!c_engine.isBlacklisted(_account)) {
             _mint(_account, _amount);
         } else {
             revert BTtokens__AccountIsBlacklisted();
@@ -118,7 +129,7 @@ contract BTtokens_v1 is
      * @param _amount The amount of tokens to burn.
      */
     function burn(address _account, uint256 _amount) public restricted {
-        if (BTtokensEngine_v1(s_engine).isBlacklisted(_account)) {
+        if (c_engine.isBlacklisted(_account)) {
             _burn(_account, _amount);
         } else {
             revert BTtokens__AccountIsNotBlacklisted();
@@ -149,16 +160,16 @@ contract BTtokens_v1 is
      * @notice Pause token.
      */
     function pauseToken() public whenNotPaused restricted {
-        s_isPaused = true;
         _pause();
+        s_isPaused = true;
     }
 
     /**
      * @notice Unpause token.
      */
     function unPauseToken() public whenPaused restricted {
-        s_isPaused = false;
         _unpause();
+        s_isPaused = false;
     }
 
     /**
