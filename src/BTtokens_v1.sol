@@ -24,7 +24,7 @@ contract BTtokens_v1 is
     UUPSUpgradeable,
     ERC20Upgradeable,
     AccessManagedUpgradeable,
-    ERC20PausableUpgradeable,
+    //ERC20PausableUpgradeable//,
     OwnableUpgradeable
 {
     ///////////////////
@@ -32,6 +32,8 @@ contract BTtokens_v1 is
     ///////////////////
     error BTtokens__AccountIsBlacklisted();
     error BTtokens__AccountIsNotBlacklisted();
+    error BTtokens__EngineIsNotPaused();
+    error BTtokens__EngineIsPaused();
 
     ///////////////////
     //     Types    ///
@@ -47,7 +49,7 @@ contract BTtokens_v1 is
     string s_symbol;
     uint8 s_decimals;
     bool s_initialized;
-    bool s_isPaused;
+    // bool s_isPaused;
     BTtokensEngine_v1 c_engine;
 
     //////////////////
@@ -61,6 +63,20 @@ contract BTtokens_v1 is
     modifier notBlacklisted(address account) {
         if (BTtokensEngine_v1(s_engine).isBlacklisted(account)) {
             revert BTtokens__AccountIsBlacklisted();
+        }
+        _;
+    }
+
+    modifier whenEnginePaused() {
+        if (!BTtokensEngine_v1(s_engine).isEnginePaused()) {
+            revert BTtokens__EngineIsNotPaused();
+        }
+        _;
+    }
+
+    modifier whenNotEnginePaused() {
+        if (BTtokensEngine_v1(s_engine).isEnginePaused()) {
+            revert BTtokens__EngineIsPaused();
         }
         _;
     }
@@ -95,14 +111,14 @@ contract BTtokens_v1 is
         __ERC20_init(tokenName, tokenSymbol);
         __AccessManaged_init(tokenManager);
         __Ownable_init(owner);
-        __ERC20Pausable_init();
+        // __ERC20Pausable_init();
         s_engine = engine;
         s_manager = tokenManager;
         s_name = tokenName;
         s_symbol = tokenSymbol;
         s_decimals = tokenDecimals;
         s_initialized = true;
-        s_isPaused = false;
+        // s_isPaused = false;
         c_engine = BTtokensEngine_v1(s_engine);
     }
 
@@ -115,7 +131,7 @@ contract BTtokens_v1 is
      * @param _account The address to mint tokens to.
      * @param _amount The amount of tokens to mint.
      */
-    function mint(address _account, uint256 _amount) public whenNotPaused restricted {
+    function mint(address _account, uint256 _amount) public whenNotEnginePaused restricted {
         if (!c_engine.isBlacklisted(_account)) {
             _mint(_account, _amount);
         } else {
@@ -152,25 +168,25 @@ contract BTtokens_v1 is
         return s_initialized;
     }
 
-    function isPaused() public view returns (bool) {
-        return s_isPaused;
-    }
+    // function isPaused() public view returns (bool) {
+    //     return s_isPaused;
+    // }
 
-    /**
-     * @notice Pause token.
-     */
-    function pauseToken() public whenNotPaused restricted {
-        _pause();
-        s_isPaused = true;
-    }
+    // /**
+    //  * @notice Pause token.
+    //  */
+    // function pauseToken() public whenNotPaused restricted {
+    //     _pause();
+    //     s_isPaused = true;
+    // }
 
-    /**
-     * @notice Unpause token.
-     */
-    function unPauseToken() public whenPaused restricted {
-        _unpause();
-        s_isPaused = false;
-    }
+    // /**
+    //  * @notice Unpause token.
+    //  */
+    // function unPauseToken() public whenPaused restricted {
+    //     _unpause();
+    //     s_isPaused = false;
+    // }
 
     /**
      * @notice Sets a token allowance for a spender to spend on behalf of the caller.
@@ -185,7 +201,7 @@ contract BTtokens_v1 is
         public
         virtual
         override
-        whenNotPaused
+        whenNotEnginePaused
         notBlacklisted(msg.sender)
         notBlacklisted(spender)
         returns (bool)
@@ -212,7 +228,7 @@ contract BTtokens_v1 is
         public
         virtual
         override
-        whenNotPaused
+        whenNotEnginePaused
         notBlacklisted(msg.sender)
         notBlacklisted(from)
         notBlacklisted(to)
@@ -237,7 +253,7 @@ contract BTtokens_v1 is
         public
         virtual
         override(ERC20Upgradeable)
-        whenNotPaused
+        whenNotEnginePaused
         notBlacklisted(msg.sender)
         notBlacklisted(to)
         returns (bool)
@@ -251,15 +267,7 @@ contract BTtokens_v1 is
     // Internal Functions ///
     /////////////////////////
 
-    function _update(
-        address from,
-        address to,
-        uint256 value
-    )
-        internal
-        override(ERC20Upgradeable, ERC20PausableUpgradeable)
-        whenNotPaused
-    {
+    function _update(address from, address to, uint256 value) internal override(ERC20Upgradeable) whenNotEnginePaused {
         super._update(from, to, value);
     }
 

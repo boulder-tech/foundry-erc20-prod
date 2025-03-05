@@ -5,6 +5,7 @@ import { console2 } from "forge-std/Test.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { BTtokens_v1 } from "./BTtokens_v1.sol";
 import { BTtokensManager } from "./BTtokensManager.sol";
@@ -17,7 +18,7 @@ contract BTtokenProxy is ERC1967Proxy {
     constructor(address implementation, bytes memory _data) payable ERC1967Proxy(implementation, _data) { }
 }
 
-contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable {
+contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable, PausableUpgradeable {
     ///////////////////
     //    Errors    ///
     ///////////////////
@@ -132,6 +133,7 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
         nonZeroAddress(accessManagerAddress)
     {
         __Ownable_init(initialOwner);
+        __Pausable_init();
         __UUPSUpgradeable_init();
         s_tokenImplementationAddress = tokenImplementationAddress;
         s_accessManagerAddress = accessManagerAddress;
@@ -173,13 +175,32 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
 
         _setMinterRole(address(newProxyToken), agent);
         _setBurnerRole(address(newProxyToken), agent);
-        _setPauserRole(address(newProxyToken), address(this));
-        _setUnPauserRole(address(newProxyToken), address(this));
+        // _setPauserRole(address(newProxyToken), address(this));
+        // _setUnPauserRole(address(newProxyToken), address(this));
 
         emit TokenCreated(address(this), address(newProxyToken), tokenName, tokenSymbol);
         return address(newProxyToken);
     }
 
+    /////////   Admin functions   /////////
+
+    /**
+     * @notice This function sets a new token implementation address. Once set all tokens deployed by this engine will
+     * use the new implementation. We should upgrade the already deployed tokens.
+     * @param newTokenImplementationAddress New token implementation address
+     */
+    function setNewTokenImplementationAddress(address newTokenImplementationAddress)
+        external
+        onlyOwner
+        nonZeroAddress(newTokenImplementationAddress)
+    {
+        require(newTokenImplementationAddress != s_tokenImplementationAddress, "Already using this implementation");
+
+        s_tokenImplementationAddress = newTokenImplementationAddress;
+        emit NewTokenImplementationSet(s_tokenImplementationAddress);
+    }
+
+    /////////   Admin functions   /////////
     ///////// Blacklist functions /////////
 
     /**
@@ -210,32 +231,23 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
     /**
      * @notice Function to pause the engine, could be usefull when upgrading.
      */
-    function pauseEngine() external onlyOwner whenNotEnginePaused {
+    function pauseEngine() external onlyOwner whenNotPaused {
         _pauseEngine();
     }
 
-    function unPauseEngine() external onlyOwner whenEnginePaused {
+    function unPauseEngine() external onlyOwner whenPaused {
         _unPauseEngine();
     }
 
-    /////////   Pause functions   /////////
-    /////////   Admin functions   /////////
-
     /**
-     * @notice This function sets a new token implementation address. Once set all tokens deployed by this engine will
-     * use the new implementation. We should upgrade the already deployed tokens.
-     * @param newTokenImplementationAddress New token implementation address
+     * @notice Returns the state of the engine.
      */
-    function setNewTokenImplementationAddress(address newTokenImplementationAddress)
-        external
-        onlyOwner
-        nonZeroAddress(newTokenImplementationAddress)
-    {
-        require(newTokenImplementationAddress != s_tokenImplementationAddress, "Already using this implementation");
-
-        s_tokenImplementationAddress = newTokenImplementationAddress;
-        emit NewTokenImplementationSet(s_tokenImplementationAddress);
+    function isEnginePaused() external view returns (bool) {
+        return s_enginePaused;
     }
+
+    /////////   Pause functions   /////////
+    ////////   Getters functions  /////////
 
     /**
      * @notice This function will be helpfull when upgrading token contracts if token implementation address is updated.
@@ -291,10 +303,12 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
     /////////   Pause functions   /////////
 
     function _pauseEngine() internal {
+        super._pause();
         s_enginePaused = true;
     }
 
     function _unPauseEngine() internal {
+        super._unpause();
         s_enginePaused = false;
     }
 

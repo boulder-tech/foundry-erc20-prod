@@ -3,12 +3,13 @@ pragma solidity ^0.8.18;
 
 import { Test, console, console2 } from "forge-std/Test.sol";
 import { DeployEngine } from "../script/DeployEngine.s.sol";
-import { BTtokensEngine_v1, OwnableUpgradeable, Initializable } from "../src/BTtokensEngine_v1.sol";
+import { BTtokensEngine_v1, OwnableUpgradeable, Initializable, BTtokenProxy } from "../src/BTtokensEngine_v1.sol";
 import { BTtokens_v1 } from "../src/BTtokens_v1.sol";
 import { BTtokensManager } from "../src/BTtokensManager.sol";
 
 contract DeployAndUpgradeTest is Test {
     DeployEngine public engineDeployer;
+    BTtokenProxy tokenProxy;
     // UpgradeBox public upgrader;
     address public engineProxy;
     address public tokenImplementationAddress;
@@ -170,4 +171,198 @@ contract DeployAndUpgradeTest is Test {
 
         assertEq(BTtokensEngine_v1(engineProxy).s_tokenImplementationAddress(), newImplementation);
     }
+
+    ///////////////////////
+    /// Blacklist Tests ///
+    ///////////////////////
+
+    modifier deployToken() {
+        string memory tokenName = "BoulderTestToken";
+        string memory tokenSymbol = "BTT";
+        address tokenManager = tokenManagerAddress;
+        address tokenOwner = initialAdmin;
+        uint8 tokenDecimals = 6;
+
+        bytes memory data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenName, tokenSymbol, tokenDecimals);
+
+        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
+
+        _;
+    }
+
+    function testBlacklistFlow() public {
+        address testAddress = makeAddr("testAddress");
+        BTtokensEngine_v1(engineProxy).blacklist(testAddress);
+        assertTrue(BTtokensEngine_v1(engineProxy).isBlacklisted(testAddress));
+        BTtokensEngine_v1(engineProxy).unBlacklist(testAddress);
+        assertFalse(BTtokensEngine_v1(engineProxy).isBlacklisted(testAddress));
+    }
+
+    function testBlacklistedCanNotTransfer() public deployToken {
+        address testAddress = makeAddr("testAddress");
+        address testAddress2 = makeAddr("testAddress2");
+        bytes32 key = keccak256(abi.encodePacked("BoulderTestToken", "BTT"));
+        BTtokens_v1 token = BTtokens_v1(BTtokensEngine_v1(engineProxy).getDeployedTokenProxyAddress(key));
+
+        /// @dev mint tokens to testAddress
+        vm.prank(agent);
+        token.mint(testAddress, 1000);
+        vm.stopPrank();
+
+        /// @dev blacklist testAddress
+        BTtokensEngine_v1(engineProxy).blacklist(testAddress);
+
+        /// @dev testAddress can not transfer tokens
+        vm.prank(testAddress);
+        vm.expectRevert(BTtokens_v1.BTtokens__AccountIsBlacklisted.selector);
+        token.transfer(testAddress2, 500);
+        vm.stopPrank();
+    }
+
+    function testBlacklistFailsWithoutPermissions() public {
+        address testAddress = makeAddr("testAddress");
+
+        address unauthorizedUser = makeAddr("unauthorized");
+
+        vm.prank(unauthorizedUser);
+        vm.expectRevert(
+            abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, unauthorizedUser)
+        );
+        BTtokensEngine_v1(engineProxy).blacklist(testAddress);
+        vm.stopPrank();
+    }
+
+    function testUnBlacklistFailsWithoutPermissions() public {
+        address testAddress = makeAddr("testAddress");
+        address unauthorizedUser = makeAddr("unauthorized");
+
+        BTtokensEngine_v1(engineProxy).blacklist(testAddress);
+
+        vm.prank(unauthorizedUser);
+        vm.expectRevert(
+            abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, unauthorizedUser)
+        );
+        BTtokensEngine_v1(engineProxy).unBlacklist(testAddress);
+        vm.stopPrank();
+    }
+
+    function testBlacklistedForAllTokens() public deployToken {
+        string memory tokenName = "BoulderTestToken-2";
+        string memory tokenSymbol = "BTT-2";
+        address tokenManager = tokenManagerAddress;
+        address tokenOwner = initialAdmin;
+        uint8 tokenDecimals = 6;
+
+        bytes memory data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenName, tokenSymbol, tokenDecimals);
+
+        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
+
+        address testAddress = makeAddr("testAddress");
+        address testAddress2 = makeAddr("testAddress2");
+
+        bytes32 key1 = keccak256(abi.encodePacked("BoulderTestToken", "BTT"));
+        BTtokens_v1 token1 = BTtokens_v1(BTtokensEngine_v1(engineProxy).getDeployedTokenProxyAddress(key1));
+
+        // console.log("key1: ", key1);
+
+        bytes32 key2 = keccak256(abi.encodePacked("BoulderTestToken-2", "BTT-2"));
+        BTtokens_v1 token2 = BTtokens_v1(BTtokensEngine_v1(engineProxy).getDeployedTokenProxyAddress(key2));
+
+        // console2.log("key2: ", key2);
+
+        /// @dev mint tokens1 to testAddress, check: why cannot mint token2 to testAddress in same prank? Using prank it
+        /// fails because it changes the address, but using startPrank it works
+        vm.startPrank(agent);
+        token1.mint(testAddress, 1000);
+        token2.mint(testAddress, 1000);
+        vm.stopPrank();
+
+        assertEq(token1.balanceOf(testAddress), 1000);
+        assertEq(token2.balanceOf(testAddress), 1000);
+
+        BTtokensEngine_v1(engineProxy).blacklist(testAddress);
+
+        assertTrue(BTtokensEngine_v1(engineProxy).isBlacklisted(testAddress));
+
+        /// @dev testAddress can not transfer tokens
+        vm.startPrank(testAddress);
+        vm.expectRevert(BTtokens_v1.BTtokens__AccountIsBlacklisted.selector);
+        token1.transfer(testAddress2, 500);
+
+        vm.expectRevert(BTtokens_v1.BTtokens__AccountIsBlacklisted.selector);
+        token2.transfer(testAddress2, 500);
+        vm.stopPrank();
+    }
+
+    // ///////////////////
+    // /// Pause Tests ///
+    // ///////////////////
+
+    // function testPauseAndUnpause() public {
+    //     address token = BTtokensEngine_v1(engineProxy).s_tokenImplementationAddress();
+    //     BTtokens_v1(token).pause();
+    //     assertTrue(BTtokens_v1(token).paused());
+    //     BTtokens_v1(token).unpause();
+    //     assertFalse(BTtokens_v1(token).paused());
+    // }
+
+    // function testPauseFailsWithoutPermissions() public {
+    //     address token = BTtokensEngine_v1(engineProxy).s_tokenImplementationAddress();
+    //     address unauthorizedUser = makeAddr("unauthorized");
+
+    //     vm.prank(unauthorizedUser);
+    //     vm.expectRevert(
+    //         abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, unauthorizedUser)
+    //     );
+    //     BTtokens_v1(token).pause();
+    //     vm.stopPrank();
+    // }
+
+    // function testUnpauseFailsWithoutPermissions() public {
+    //     address token = BTtokensEngine_v1(engineProxy).s_tokenImplementationAddress();
+    //     address unauthorizedUser = makeAddr("unauthorized");
+
+    //     BTtokens_v1(token).pause();
+
+    //     vm.prank(unauthorizedUser);
+    //     vm.expectRevert(
+    //         abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, unauthorizedUser)
+    //     );
+    //     BTtokens_v1(token).unpause();
+    //     vm.stopPrank();
+    // }
+
+    // function testPauseAndUnpauseFailsIfAlreadyPaused() public {
+    //     address token = BTtokensEngine_v1(engineProxy).s_tokenImplementationAddress();
+    //     BTtokens_v1(token).pause();
+    //     assertTrue(BTtokens_v1(token).paused());
+    //     vm.expectRevert(BTtokens_v1.PausableAlreadyPaused.selector);
+    //     BTtokens_v1(token).pause();
+    // }
+
+    // function testUnpauseFailsIfNotPaused() public {
+    //     address token = BTtokensEngine_v1(engineProxy).s_tokenImplementationAddress();
+    //     assertFalse(BTtokens_v1(token).paused());
+    //     vm.expectRevert(BTtokens_v1.PausableNotPaused.selector);
+    //     BTtokens_v1(token).unpause();
+    // }
+
+    // function testPauseAndUnpauseFailsIfNotAdmin() public {
+    //     address token = BTtokensEngine_v1(engineProxy).s_tokenImplementationAddress();
+    //     address unauthorizedUser = makeAddr("unauthorized");
+
+    //     vm.prank(unauthorizedUser);
+    //     vm.expectRevert(
+    //         abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, unauthorizedUser)
+    //     );
+    //     BTtokens_v1(token).pause();
+    //     vm.stopPrank();
+
+    //     vm.prank(unauthorizedUser);
+    //     vm.expectRevert(
+    //         abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, unauthorizedUser)
+    //     );
+    //     BTtokens_v1(token).unpause();
+    //     vm.stopPrank();
+    // }
 }
