@@ -43,12 +43,12 @@ contract BTtokens_v1 is
     // State Variables ///
     //////////////////////
 
-    address private s_engine;
-    address private s_manager;
-    string s_name;
-    string s_symbol;
-    uint8 s_decimals;
-    bool s_initialized;
+    address public s_engine;
+    address public s_manager;
+    string public s_name;
+    string public s_symbol;
+    uint8 public s_decimals;
+    bool public s_initialized;
     // bool s_isPaused;
     BTtokensEngine_v1 c_engine;
 

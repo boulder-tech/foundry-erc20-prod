@@ -71,6 +71,8 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
     event BurnerRoleSet(address indexed tokenProxyAddress, address indexed agent);
     event PauserRoleSet(address indexed tokenProxyAddress, address indexed pauser);
     event UnPauserRoleSet(address indexed tokenProxyAddress, address indexed pauser);
+    event EnginePaused(address indexed engine);
+    event EngineUnpaused(address indexed engine);
 
     ///////////////////
     //   Modifiers  ///
@@ -138,7 +140,7 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
         s_tokenImplementationAddress = tokenImplementationAddress;
         s_accessManagerAddress = accessManagerAddress;
         s_initialized = true;
-        s_enginePaused = false;
+        s_enginePaused = false; // Set role to pause the engine?
     }
 
     /////////////////////////
@@ -303,13 +305,15 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
     /////////   Pause functions   /////////
 
     function _pauseEngine() internal {
-        super._pause();
+        _pause();
         s_enginePaused = true;
+        emit EnginePaused(address(this));
     }
 
     function _unPauseEngine() internal {
-        super._unpause();
+        _unpause();
         s_enginePaused = false;
+        emit EngineUnpaused(address(this));
     }
 
     /////////   Pause functions   /////////
