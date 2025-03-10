@@ -1,1 +1,1 @@
-testPauseUnpauseEvents
+testSetNewTokenImplementationAddressShouldFailIfAlreadyInUse

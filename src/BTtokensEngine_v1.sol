@@ -26,8 +26,10 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
     error BTtokensEngine__AddressCanNotBeZero();
     error BTtokensEngine__AccountIsBlacklisted();
     error BTtokensEngine__TokenNameAndSymbolAlreadyInUsed();
+    error BTtokensEngine__TokenImplementationAlreadyInUse();
     error BTtokensEngine__EnginePaused();
     error BTtokensEngine__EngineNotPaused();
+    error BTtokensEngine__TokenNotDeployed();
 
     ///////////////////
     //     Types    ///
@@ -96,6 +98,13 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
         bytes32 salt = keccak256(abi.encodePacked(tokenName, tokenSymbol));
         if (s_deployedTokens[salt] != address(0)) {
             revert BTtokensEngine__TokenNameAndSymbolAlreadyInUsed();
+        }
+        _;
+    }
+
+    modifier nonRepeatedTokenImplementationAddress(address newTokenImplementationAddress) {
+        if (newTokenImplementationAddress == s_tokenImplementationAddress) {
+            revert BTtokensEngine__TokenImplementationAlreadyInUse();
         }
         _;
     }
@@ -195,9 +204,8 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
         external
         onlyOwner
         nonZeroAddress(newTokenImplementationAddress)
+        nonRepeatedTokenImplementationAddress(newTokenImplementationAddress)
     {
-        require(newTokenImplementationAddress != s_tokenImplementationAddress, "Already using this implementation");
-
         s_tokenImplementationAddress = newTokenImplementationAddress;
         emit NewTokenImplementationSet(s_tokenImplementationAddress);
     }
@@ -256,6 +264,10 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
      * @param key Bytes32 key to get the token proxy address
      */
     function getDeployedTokenProxyAddress(bytes32 key) external view returns (address) {
+        /// @dev check if the token is deployed, this is a branch
+        if (s_deployedTokens[key] == address(0)) {
+            revert BTtokensEngine__TokenNotDeployed();
+        }
         return s_deployedTokens[key];
     }
 
@@ -378,7 +390,7 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
      * can authorize an upgrade to a new implementation contract.
      * @param _newImplementation The address of the new implementation contract.
      */
-    function _authorizeUpgrade(address _newImplementation) internal override onlyOwner { }
+    function _authorizeUpgrade(address _newImplementation) internal virtual override onlyOwner { }
 
     /**
      * @dev Reserved storage space to allow for layout changes in the future. uint256[50] __gap;

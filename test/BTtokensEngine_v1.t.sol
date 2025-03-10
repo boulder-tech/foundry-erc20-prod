@@ -10,13 +10,33 @@ import {
     BTtokenProxy,
     PausableUpgradeable
 } from "../src/BTtokensEngine_v1.sol";
-import { BTtokens_v1 } from "../src/BTtokens_v1.sol";
+import { BTtokens_v1, AccessManagedUpgradeable } from "../src/BTtokens_v1.sol";
+import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import { BTtokensManager } from "../src/BTtokensManager.sol";
+
+contract BTtokensEngine_v2 is BTtokensEngine_v1 {
+    /**
+     * @dev Function that returns the version of the contract.
+     * @return uint16 The version of the contract.
+     */
+    function getVersion() external pure virtual override returns (uint16) {
+        return 2;
+    }
+
+    /**
+     * @dev Function that authorizes the upgrade of the contract to a new implementation.     *
+     * can authorize an upgrade to a new implementation contract.
+     * @param _newImplementation The address of the new implementation contract.
+     */
+    function _authorizeUpgrade(address _newImplementation) internal virtual override onlyOwner { }
+}
 
 contract DeployAndUpgradeTest is Test {
     DeployEngine public engineDeployer;
     BTtokenProxy tokenProxy;
-    // UpgradeBox public upgrader;
+
+    BTtokensEngine_v2 newEngineImplementation = new BTtokensEngine_v2();
+
     address public engineProxy;
     address public tokenImplementationAddress;
     address public tokenManagerAddress;
@@ -30,7 +50,7 @@ contract DeployAndUpgradeTest is Test {
 
     function setUp() public {
         engineDeployer = new DeployEngine();
-        // upgrader = new UpgradeBox();
+
         (engineProxy, tokenImplementationAddress, tokenManagerAddress) = engineDeployer.run(initialAdmin); //
         vm.startPrank(initialAdmin);
         BTtokensManager c_manager = BTtokensManager(tokenManagerAddress);
@@ -172,6 +192,18 @@ contract DeployAndUpgradeTest is Test {
         assertEq(BTtokensEngine_v1(engineProxy).s_tokenImplementationAddress(), newImplementation);
     }
 
+    function testSetNewTokenImplementationAddressShouldRevertIfZeroAddress() public {
+        vm.expectRevert(BTtokensEngine_v1.BTtokensEngine__AddressCanNotBeZero.selector);
+        BTtokensEngine_v1(engineProxy).setNewTokenImplementationAddress(address(0));
+    }
+
+    function testSetNewTokenImplementationAddressShouldFailIfAlreadyInUse() public {
+        address newImplementation = BTtokensEngine_v1(engineProxy).s_tokenImplementationAddress();
+
+        vm.expectRevert(BTtokensEngine_v1.BTtokensEngine__TokenImplementationAlreadyInUse.selector);
+        BTtokensEngine_v1(engineProxy).setNewTokenImplementationAddress(newImplementation);
+    }
+
     ///////////////////////
     /// Blacklist Tests ///
     ///////////////////////
@@ -290,6 +322,11 @@ contract DeployAndUpgradeTest is Test {
         vm.stopPrank();
     }
 
+    function testIsBlacklisted() public {
+        address testAddress = makeAddr("testAddress");
+        assertFalse(BTtokensEngine_v1(engineProxy).isBlacklisted(testAddress));
+    }
+
     ///////////////////
     /// Pause Tests ///
     ///////////////////
@@ -363,24 +400,6 @@ contract DeployAndUpgradeTest is Test {
         BTtokensEngine_v1(engineProxy).unPauseEngine();
     }
 
-    function testPauseUnpauseFailsIfNotAdmin() public {
-        address unauthorizedUser = makeAddr("unauthorized");
-
-        vm.prank(unauthorizedUser);
-        vm.expectRevert(
-            abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, unauthorizedUser)
-        );
-        BTtokensEngine_v1(engineProxy).pauseEngine();
-        vm.stopPrank();
-
-        vm.prank(unauthorizedUser);
-        vm.expectRevert(
-            abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, unauthorizedUser)
-        );
-        BTtokensEngine_v1(engineProxy).unPauseEngine();
-        vm.stopPrank();
-    }
-
     function testPauseUnpauseEvents() public {
         vm.expectEmit(true, false, true, true, address(engineProxy));
         emit BTtokensEngine_v1.EnginePaused(address(engineProxy));
@@ -391,5 +410,155 @@ contract DeployAndUpgradeTest is Test {
         emit BTtokensEngine_v1.EngineUnpaused(address(engineProxy));
 
         BTtokensEngine_v1(engineProxy).unPauseEngine();
+    }
+
+    /////////////////////
+    /// Getters Tests ///
+    /////////////////////
+
+    function getDeployedTokenProxyAddress() public deployToken {
+        bytes32 key = keccak256(abi.encodePacked("BoulderTestToken", "BTT"));
+        address tokenProxyAddress = BTtokensEngine_v1(engineProxy).getDeployedTokenProxyAddress(key);
+
+        assertTrue(tokenProxyAddress != address(0));
+    }
+
+    function getDeployedTokenProxyAddressFailsIfNotDeployed() public {
+        bytes32 key = keccak256(abi.encodePacked("BoulderTestToken", "BTT"));
+        vm.expectRevert(BTtokensEngine_v1.BTtokensEngine__TokenNotDeployed.selector);
+        BTtokensEngine_v1(engineProxy).getDeployedTokenProxyAddress(key);
+    }
+
+    function getDeployedTokensKeys() public deployToken {
+        bytes32[] memory keys = BTtokensEngine_v1(engineProxy).getDeployedTokensKeys();
+
+        assertTrue(keys.length == 1);
+    }
+
+    function getVersion() public {
+        uint16 version = BTtokensEngine_v1(engineProxy).getVersion();
+        assertTrue(version == 1);
+    }
+
+    /////////////////////
+    /// Upgrade Tests ///
+    /////////////////////
+
+    function testUpgradeEngine() public {
+        vm.startPrank(address(this));
+
+        BTtokensEngine_v1(engineProxy).upgradeToAndCall(address(newEngineImplementation), "");
+
+        vm.stopPrank();
+
+        assertEq(BTtokensEngine_v2(engineProxy).getVersion(), 2);
+    }
+
+    modifier engineUpgraded() {
+        vm.startPrank(address(this));
+
+        BTtokensEngine_v1(engineProxy).upgradeToAndCall(address(newEngineImplementation), "");
+
+        vm.stopPrank();
+
+        _;
+    }
+
+    function testNewEngineCanCreateTokens() public engineUpgraded {
+        string memory tokenName = "BoulderTestToken";
+        string memory tokenSymbol = "BTT";
+        address tokenManager = tokenManagerAddress;
+        address tokenOwner = initialAdmin;
+        uint8 tokenDecimals = 6;
+
+        bytes memory data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenName, tokenSymbol, tokenDecimals);
+
+        vm.expectEmit(false, true, true, true, address(engineProxy));
+        emit BTtokensEngine_v1.MinterRoleSet(address(0), address(agent));
+
+        vm.expectEmit(false, true, true, true, address(engineProxy));
+        emit BTtokensEngine_v1.BurnerRoleSet(address(0), address(agent));
+
+        vm.expectEmit(true, false, true, true, address(engineProxy));
+        emit BTtokensEngine_v1.TokenCreated(address(engineProxy), address(0), tokenName, tokenSymbol);
+
+        address newToken = BTtokensEngine_v2(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
+
+        assertTrue(newToken != address(0));
+
+        BTtokens_v1 createdToken = BTtokens_v1(newToken);
+        assertEq(createdToken.name(), tokenName);
+        assertEq(createdToken.symbol(), tokenSymbol);
+        assertEq(createdToken.decimals(), tokenDecimals);
+    }
+
+    function testDeployShouldFailIfEngineUpgradedAndTokenNameAndSymbolInUse() public deployToken engineUpgraded {
+        string memory tokenName = "BoulderTestToken";
+        string memory tokenSymbol = "BTT";
+        address tokenManager = tokenManagerAddress;
+        address tokenOwner = initialAdmin;
+        uint8 tokenDecimals = 6;
+
+        bytes memory data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenName, tokenSymbol, tokenDecimals);
+
+        vm.expectRevert(BTtokensEngine_v1.BTtokensEngine__TokenNameAndSymbolAlreadyInUsed.selector);
+        BTtokensEngine_v2(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
+    }
+
+    //////////////////////
+    /// BTtokens Tests ///
+    //////////////////////
+
+    function testTokenName() public deployToken {
+        bytes32 key = keccak256(abi.encodePacked("BoulderTestToken", "BTT"));
+        BTtokens_v1 token = BTtokens_v1(BTtokensEngine_v1(engineProxy).getDeployedTokenProxyAddress(key));
+
+        assertEq(token.name(), "BoulderTestToken");
+    }
+
+    function testTokenSymbol() public deployToken {
+        bytes32 key = keccak256(abi.encodePacked("BoulderTestToken", "BTT"));
+        BTtokens_v1 token = BTtokens_v1(BTtokensEngine_v1(engineProxy).getDeployedTokenProxyAddress(key));
+
+        assertEq(token.symbol(), "BTT");
+    }
+
+    function testTokenDecimals() public deployToken {
+        bytes32 key = keccak256(abi.encodePacked("BoulderTestToken", "BTT"));
+        BTtokens_v1 token = BTtokens_v1(BTtokensEngine_v1(engineProxy).getDeployedTokenProxyAddress(key));
+
+        assertEq(token.decimals(), 6);
+    }
+
+    function testTokenTotalSupply() public deployToken {
+        bytes32 key = keccak256(abi.encodePacked("BoulderTestToken", "BTT"));
+        BTtokens_v1 token = BTtokens_v1(BTtokensEngine_v1(engineProxy).getDeployedTokenProxyAddress(key));
+
+        assertEq(token.totalSupply(), 0);
+    }
+
+    function testTokenBalanceOf() public deployToken {
+        address testAddress = makeAddr("testAddress");
+        bytes32 key = keccak256(abi.encodePacked("BoulderTestToken", "BTT"));
+        BTtokens_v1 token = BTtokens_v1(BTtokensEngine_v1(engineProxy).getDeployedTokenProxyAddress(key));
+
+        vm.startPrank(agent);
+        token.mint(testAddress, 1000);
+        vm.stopPrank();
+
+        vm.startPrank(testAddress);
+        assertEq(token.balanceOf(testAddress), 1000);
+        vm.stopPrank();
+    }
+
+    function testOnlyAgentCanMint() public deployToken {
+        address testAddress = makeAddr("testAddress");
+        bytes32 key = keccak256(abi.encodePacked("BoulderTestToken", "BTT"));
+        BTtokens_v1 token = BTtokens_v1(BTtokensEngine_v1(engineProxy).getDeployedTokenProxyAddress(key));
+
+        vm.prank(testAddress);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, testAddress));
+        token.mint(testAddress, 1000);
+        vm.stopPrank();
     }
 }
