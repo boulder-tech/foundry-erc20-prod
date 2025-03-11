@@ -25,6 +25,7 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
     error BTtokensEngine__EngineShouldNotBeInitialized();
     error BTtokensEngine__AddressCanNotBeZero();
     error BTtokensEngine__AccountIsBlacklisted();
+    error BTtokensEngine__AccountIsNotBlacklisted();
     error BTtokensEngine__TokenNameAndSymbolAlreadyInUsed();
     error BTtokensEngine__TokenImplementationAlreadyInUse();
     error BTtokensEngine__EnginePaused();
@@ -68,7 +69,7 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
     event TokenCreated(address indexed engine, address indexed tokenProxyAddress, string name, string symbol);
     event Blacklisted(address indexed user);
     event UnBlacklisted(address indexed user);
-    event NewTokenImplementationSet(address indexed newTokenImplementation);
+    event NewTokenImplementationSet(address indexed engine, address indexed newTokenImplementation);
     event MinterRoleSet(address indexed tokenProxyAddress, address indexed agent);
     event BurnerRoleSet(address indexed tokenProxyAddress, address indexed agent);
     event PauserRoleSet(address indexed tokenProxyAddress, address indexed pauser);
@@ -94,6 +95,13 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
         _;
     }
 
+    modifier blacklisted(address account) {
+        if (!_isBlacklisted(account)) {
+            revert BTtokensEngine__AccountIsNotBlacklisted();
+        }
+        _;
+    }
+
     modifier nonRepeatedNameAndSymbol(string memory tokenName, string memory tokenSymbol) {
         bytes32 salt = keccak256(abi.encodePacked(tokenName, tokenSymbol));
         if (s_deployedTokens[salt] != address(0)) {
@@ -105,6 +113,13 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
     modifier nonRepeatedTokenImplementationAddress(address newTokenImplementationAddress) {
         if (newTokenImplementationAddress == s_tokenImplementationAddress) {
             revert BTtokensEngine__TokenImplementationAlreadyInUse();
+        }
+        _;
+    }
+
+    modifier nonTokenDeployed(bytes32 key) {
+        if (s_deployedTokens[key] == address(0)) {
+            revert BTtokensEngine__TokenNotDeployed();
         }
         _;
     }
@@ -173,6 +188,7 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
         external
         onlyOwner
         nonRepeatedNameAndSymbol(tokenName, tokenSymbol)
+        whenNotEnginePaused
         returns (address)
     {
         bytes32 salt = keccak256(abi.encodePacked(tokenName, tokenSymbol));
@@ -203,11 +219,12 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
     function setNewTokenImplementationAddress(address newTokenImplementationAddress)
         external
         onlyOwner
+        whenNotEnginePaused
         nonZeroAddress(newTokenImplementationAddress)
         nonRepeatedTokenImplementationAddress(newTokenImplementationAddress)
     {
         s_tokenImplementationAddress = newTokenImplementationAddress;
-        emit NewTokenImplementationSet(s_tokenImplementationAddress);
+        emit NewTokenImplementationSet(address(this), s_tokenImplementationAddress);
     }
 
     /////////   Admin functions   /////////
@@ -217,7 +234,7 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
      * @notice Adds account to blacklist.
      * @param _account The address to blacklist.
      */
-    function blacklist(address _account) external onlyOwner {
+    function blacklist(address _account) external onlyOwner notBlacklisted(_account) {
         _blacklist(_account);
         emit Blacklisted(_account);
     }
@@ -226,7 +243,7 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
      * @notice Removes account from blacklist.
      * @param _account The address to remove from the blacklist.
      */
-    function unBlacklist(address _account) external onlyOwner {
+    function unBlacklist(address _account) external onlyOwner blacklisted(_account) {
         _unBlacklist(_account);
         emit UnBlacklisted(_account);
     }
@@ -263,11 +280,7 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
      * @notice This function will be helpfull when upgrading token contracts if token implementation address is updated.
      * @param key Bytes32 key to get the token proxy address
      */
-    function getDeployedTokenProxyAddress(bytes32 key) external view returns (address) {
-        /// @dev check if the token is deployed, this is a branch
-        if (s_deployedTokens[key] == address(0)) {
-            revert BTtokensEngine__TokenNotDeployed();
-        }
+    function getDeployedTokenProxyAddress(bytes32 key) external view nonTokenDeployed(key) returns (address) {
         return s_deployedTokens[key];
     }
 
@@ -387,10 +400,10 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
 
     /**
      * @dev Function that authorizes the upgrade of the contract to a new implementation.     *
-     * can authorize an upgrade to a new implementation contract.
+     * can authorize an upgrade to a new implementation contract. Should the engine be paused to upgrade?
      * @param _newImplementation The address of the new implementation contract.
      */
-    function _authorizeUpgrade(address _newImplementation) internal virtual override onlyOwner { }
+    function _authorizeUpgrade(address _newImplementation) internal virtual override onlyOwner whenNotEnginePaused { }
 
     /**
      * @dev Reserved storage space to allow for layout changes in the future. uint256[50] __gap;
