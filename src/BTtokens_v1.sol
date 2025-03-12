@@ -49,7 +49,6 @@ contract BTtokens_v1 is
     string public s_symbol;
     uint8 public s_decimals;
     bool public s_initialized;
-    // bool s_isPaused;
     BTtokensEngine_v1 c_engine;
 
     //////////////////
@@ -59,6 +58,13 @@ contract BTtokens_v1 is
     ///////////////////
     //   Modifiers  ///
     ///////////////////
+
+    modifier blacklisted(address account) {
+        if (!BTtokensEngine_v1(s_engine).isBlacklisted(account)) {
+            revert BTtokens__AccountIsNotBlacklisted();
+        }
+        _;
+    }
 
     modifier notBlacklisted(address account) {
         if (BTtokensEngine_v1(s_engine).isBlacklisted(account)) {
@@ -92,7 +98,7 @@ contract BTtokens_v1 is
 
     function initialize(bytes memory data) public initializer {
         (
-            address engine,
+            address tokenEngine,
             address tokenManager,
             address owner,
             string memory tokenName,
@@ -107,18 +113,17 @@ contract BTtokens_v1 is
             "invalid argument - empty string"
         );
         require(0 <= tokenDecimals && tokenDecimals <= 18, "decimals between 0 and 18");
-        require(engine != address(0), "engine can not be address 0");
+        require(tokenEngine != address(0), "engine can not be address 0");
+        require(tokenManager != address(0), "token manager can not be address 0");
         __ERC20_init(tokenName, tokenSymbol);
         __AccessManaged_init(tokenManager);
         __Ownable_init(owner);
-        // __ERC20Pausable_init();
-        s_engine = engine;
+        s_engine = tokenEngine;
         s_manager = tokenManager;
         s_name = tokenName;
         s_symbol = tokenSymbol;
         s_decimals = tokenDecimals;
         s_initialized = true;
-        // s_isPaused = false;
         c_engine = BTtokensEngine_v1(s_engine);
     }
 
@@ -126,17 +131,15 @@ contract BTtokens_v1 is
     // External Functions ///
     /////////////////////////
 
+    /////////   Supply functions   /////////
+
     /**
      * @notice Mint tokens to the desired account.
      * @param _account The address to mint tokens to.
      * @param _amount The amount of tokens to mint.
      */
-    function mint(address _account, uint256 _amount) public whenNotEnginePaused restricted {
-        if (!c_engine.isBlacklisted(_account)) {
-            _mint(_account, _amount);
-        } else {
-            revert BTtokens__AccountIsBlacklisted();
-        }
+    function mint(address _account, uint256 _amount) public whenNotEnginePaused notBlacklisted(_account) restricted {
+        _mint(_account, _amount);
     }
 
     /**
@@ -144,13 +147,12 @@ contract BTtokens_v1 is
      * @param _account The address to burn tokens from.
      * @param _amount The amount of tokens to burn.
      */
-    function burn(address _account, uint256 _amount) public restricted {
-        if (c_engine.isBlacklisted(_account)) {
-            _burn(_account, _amount);
-        } else {
-            revert BTtokens__AccountIsNotBlacklisted();
-        }
+    function burn(address _account, uint256 _amount) public blacklisted(_account) restricted {
+        _burn(_account, _amount);
     }
+
+    /////////   Supply functions   /////////
+    ////////   Getters functions   /////////
 
     function decimals() public view virtual override returns (uint8) {
         return s_decimals;
@@ -164,29 +166,24 @@ contract BTtokens_v1 is
         return s_symbol;
     }
 
+    function manager() public view virtual returns (address) {
+        return s_manager;
+    }
+
+    function engine() public view virtual returns (address) {
+        return s_engine;
+    }
+
     function initialized() public view virtual returns (bool) {
         return s_initialized;
     }
 
-    // function isPaused() public view returns (bool) {
-    //     return s_isPaused;
-    // }
+    function getVersion() external pure virtual returns (uint16) {
+        return 1;
+    }
 
-    // /**
-    //  * @notice Pause token.
-    //  */
-    // function pauseToken() public whenNotPaused restricted {
-    //     _pause();
-    //     s_isPaused = true;
-    // }
-
-    // /**
-    //  * @notice Unpause token.
-    //  */
-    // function unPauseToken() public whenPaused restricted {
-    //     _unpause();
-    //     s_isPaused = false;
-    // }
+    ////////   Getters functions   /////////
+    ////////  Transfers functions  /////////
 
     /**
      * @notice Sets a token allowance for a spender to spend on behalf of the caller.
@@ -267,11 +264,19 @@ contract BTtokens_v1 is
     // Internal Functions ///
     /////////////////////////
 
-    function _update(address from, address to, uint256 value) internal override(ERC20Upgradeable) whenNotEnginePaused {
+    function _update(address from, address to, uint256 value) internal override(ERC20Upgradeable) {
         super._update(from, to, value);
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner { }
+    /**
+     * @dev Function that authorizes the upgrade of the contract to a new implementation.     *
+     * can authorize an upgrade to a new implementation contract. Should the engine be paused to upgrade?
+     * @param _newImplementation The address of the new implementation contract.
+     */
+    function _authorizeUpgrade(address _newImplementation) internal virtual override onlyOwner whenNotEnginePaused { }
 
+    /**
+     * @dev Reserved storage space to allow for layout changes in the future. uint256[50] __gap;
+     */
     uint256[50] __gap;
 }

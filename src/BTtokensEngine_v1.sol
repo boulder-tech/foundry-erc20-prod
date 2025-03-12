@@ -51,7 +51,7 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
     bool public s_enginePaused = true;
     bytes32[] public s_deployedTokensKeys;
     bytes4[] public s_selectors;
-    // Roles are uint64 (0 is reserved for the ADMIN_ROLE)
+    /// @dev Roles are uint64 (0 is reserved for the ADMIN_ROLE)
     uint64 public constant AGENT = 10;
     uint64 public constant PAUSER = 11;
 
@@ -72,8 +72,6 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
     event NewTokenImplementationSet(address indexed engine, address indexed newTokenImplementation);
     event MinterRoleSet(address indexed tokenProxyAddress, address indexed agent);
     event BurnerRoleSet(address indexed tokenProxyAddress, address indexed agent);
-    event PauserRoleSet(address indexed tokenProxyAddress, address indexed pauser);
-    event UnPauserRoleSet(address indexed tokenProxyAddress, address indexed pauser);
     event EnginePaused(address indexed engine);
     event EngineUnpaused(address indexed engine);
 
@@ -202,8 +200,6 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
 
         _setMinterRole(address(newProxyToken), agent);
         _setBurnerRole(address(newProxyToken), agent);
-        // _setPauserRole(address(newProxyToken), address(this));
-        // _setUnPauserRole(address(newProxyToken), address(this));
 
         emit TokenCreated(address(this), address(newProxyToken), tokenName, tokenSymbol);
         return address(newProxyToken);
@@ -364,28 +360,6 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
 
         c_manager.setTargetFunctionRole(tokenProxyAddress, s_selectors, AGENT);
         emit BurnerRoleSet(tokenProxyAddress, agent);
-    }
-
-    function _setPauserRole(address tokenProxyAddress, address pauser) internal {
-        // Grant the agent role with no execution delay
-        BTtokensManager c_manager = BTtokensManager(s_accessManagerAddress);
-        c_manager.grantRole(PAUSER, pauser, 0);
-
-        _cleanAndPushSelector4Bytes(PAUSE_4_BYTES);
-
-        c_manager.setTargetFunctionRole(tokenProxyAddress, s_selectors, PAUSER);
-        emit PauserRoleSet(tokenProxyAddress, pauser);
-    }
-
-    function _setUnPauserRole(address tokenProxyAddress, address pauser) internal {
-        // Grant the agent role with no execution delay
-        BTtokensManager c_manager = BTtokensManager(s_accessManagerAddress);
-        c_manager.grantRole(PAUSER, pauser, 0);
-
-        _cleanAndPushSelector4Bytes(UNPAUSE_4_BYTES);
-
-        c_manager.setTargetFunctionRole(tokenProxyAddress, s_selectors, PAUSER);
-        emit UnPauserRoleSet(tokenProxyAddress, pauser);
     }
 
     function _cleanAndPushSelector4Bytes(bytes4 selector) internal {

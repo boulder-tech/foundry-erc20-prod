@@ -28,7 +28,7 @@ contract BTtokensEngine_v2 is BTtokensEngine_v1 {
      * can authorize an upgrade to a new implementation contract.
      * @param _newImplementation The address of the new implementation contract.
      */
-    function _authorizeUpgrade(address _newImplementation) internal virtual override onlyOwner { }
+    function _authorizeUpgrade(address _newImplementation) internal virtual override onlyOwner whenNotEnginePaused { }
 }
 
 contract DeployAndUpgradeTest is Test {
@@ -121,7 +121,7 @@ contract DeployAndUpgradeTest is Test {
     /// Deploy Tokens Tests ///
     ///////////////////////////
 
-    function testDeployBTtokenAndSetRoles() public {
+    function testCreateBTtokenAndSetRoles() public {
         string memory tokenName = "BoulderTestToken";
         string memory tokenSymbol = "BTT";
         address tokenManager = tokenManagerAddress;
@@ -130,6 +130,7 @@ contract DeployAndUpgradeTest is Test {
 
         bytes memory data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenName, tokenSymbol, tokenDecimals);
 
+        /// @dev address(0) on events means that we dont know the address yet
         vm.expectEmit(false, true, true, true, address(engineProxy));
         emit BTtokensEngine_v1.MinterRoleSet(address(0), address(agent));
 
@@ -152,7 +153,7 @@ contract DeployAndUpgradeTest is Test {
     function testShouldFailDeployBTtokenSameNameAndSymbol() public {
         string memory tokenName = "BoulderTestToken";
         string memory tokenSymbol = "BTT";
-        address tokenManager = address(0);
+        address tokenManager = tokenManagerAddress;
         address tokenOwner = initialAdmin;
         uint8 tokenDecimals = 6;
 
@@ -177,6 +178,17 @@ contract DeployAndUpgradeTest is Test {
         );
         BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, unauthorizedUser);
         vm.stopPrank();
+    }
+
+    function testCreateTokenShouldFailIfEnginePaused() public {
+        BTtokensEngine_v1(engineProxy).pauseEngine();
+
+        string memory tokenName = "PausedToken";
+        string memory tokenSymbol = "PTK";
+        bytes memory data = abi.encode(engineProxy, tokenManagerAddress, initialAdmin, tokenName, tokenSymbol, 6);
+
+        vm.expectRevert(BTtokensEngine_v1.BTtokensEngine__EnginePaused.selector);
+        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
     }
 
     function testGrantAndRevokeRoles() public {
@@ -533,6 +545,8 @@ contract DeployAndUpgradeTest is Test {
     /////////////////////
     /// Upgrade Tests ///
     /////////////////////
+
+    /// @dev new implementation should reinitialize the contract?
 
     function testUpgradeEngine() public {
         vm.startPrank(address(this));
