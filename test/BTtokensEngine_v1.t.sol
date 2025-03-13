@@ -546,9 +546,11 @@ contract DeployAndUpgradeTest is Test {
     /// Upgrade Tests ///
     /////////////////////
 
-    /// @dev new implementation should reinitialize the contract?
+    /// @dev new implementation should reinitialize the contract? Not necessary
 
     function testUpgradeEngine() public {
+        BTtokensEngine_v1(engineProxy).pauseEngine();
+
         vm.startPrank(address(this));
 
         BTtokensEngine_v1(engineProxy).upgradeToAndCall(address(newEngineImplementation), "");
@@ -567,11 +569,9 @@ contract DeployAndUpgradeTest is Test {
         vm.stopPrank();
     }
 
-    function testEngineUpgradeToNewImplementationFailsIfPaused() public {
-        BTtokensEngine_v1(engineProxy).pauseEngine();
-
+    function testEngineUpgradeToNewImplementationFailsIfNotPaused() public {
         vm.startPrank(address(this));
-        vm.expectRevert(BTtokensEngine_v1.BTtokensEngine__EnginePaused.selector);
+        vm.expectRevert(BTtokensEngine_v1.BTtokensEngine__EngineNotPaused.selector);
         BTtokensEngine_v1(engineProxy).upgradeToAndCall(address(newEngineImplementation), "");
         vm.stopPrank();
     }
@@ -579,8 +579,9 @@ contract DeployAndUpgradeTest is Test {
     modifier engineUpgraded() {
         vm.startPrank(address(this));
 
+        BTtokensEngine_v1(engineProxy).pauseEngine();
         BTtokensEngine_v1(engineProxy).upgradeToAndCall(address(newEngineImplementation), "");
-
+        BTtokensEngine_v1(engineProxy).unPauseEngine();
         vm.stopPrank();
 
         _;

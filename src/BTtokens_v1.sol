@@ -4,8 +4,6 @@ pragma solidity ^0.8.24;
 import { AccessManagedUpgradeable } from
     "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import { ERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import { ERC20PausableUpgradeable } from
-    "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PausableUpgradeable.sol";
 import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -20,13 +18,7 @@ import { BTtokensEngine_v1 } from "./BTtokensEngine_v1.sol";
  *         to ensure secure and regulated usage within the BoulderTech ecosystem.
  *         The token can be paused, minted, and burned under specific restrictions.
  */
-contract BTtokens_v1 is
-    UUPSUpgradeable,
-    ERC20Upgradeable,
-    AccessManagedUpgradeable,
-    //ERC20PausableUpgradeable//,
-    OwnableUpgradeable
-{
+contract BTtokens_v1 is UUPSUpgradeable, ERC20Upgradeable, AccessManagedUpgradeable, OwnableUpgradeable {
     ///////////////////
     //    Errors    ///
     ///////////////////
@@ -273,7 +265,7 @@ contract BTtokens_v1 is
      * can authorize an upgrade to a new implementation contract. Should the engine be paused to upgrade?
      * @param _newImplementation The address of the new implementation contract.
      */
-    function _authorizeUpgrade(address _newImplementation) internal virtual override onlyOwner whenNotEnginePaused { }
+    function _authorizeUpgrade(address _newImplementation) internal virtual override onlyOwner whenEnginePaused { }
 
     /**
      * @dev Reserved storage space to allow for layout changes in the future. uint256[50] __gap;

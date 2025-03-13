@@ -1,1 +1,1 @@
-testAgentCanBurnIfBlacklistedAndEnginePaused
+testEngineUpgradeToNewImplementationFailsIfNotPaused

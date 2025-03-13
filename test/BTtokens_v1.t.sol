@@ -35,6 +35,8 @@ contract DeployAndUpgradeTest is Test {
     DeployEngine public engineDeployer;
     BTtokenProxy tokenProxy;
 
+    BTtokens_v1 token;
+
     BTtokens_v2 newTokenImplementation = new BTtokens_v2();
 
     address public engineProxy;
@@ -47,8 +49,14 @@ contract DeployAndUpgradeTest is Test {
     address initialAdmin = makeAddr("initialAdmin");
     address agent = makeAddr("agent");
 
+    address testAddress = makeAddr("testAddress");
+    address testAddress2 = makeAddr("testAddress2");
+    address testAddress3 = makeAddr("testAddress3");
+
     uint64 public constant ADMIN_ROLE = type(uint64).min;
     uint64 public constant AGENT = 10; // Roles are uint64 (0 is reserved for the ADMIN_ROLE)
+
+    uint256 public constant AMOUNT = 1000;
 
     function setUp() public {
         engineDeployer = new DeployEngine();
@@ -69,6 +77,8 @@ contract DeployAndUpgradeTest is Test {
         data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenName, tokenSymbol, tokenDecimals);
 
         tokenAddress = BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
+
+        token = BTtokens_v1(tokenAddress);
     }
 
     ////////////////////////////
@@ -154,51 +164,30 @@ contract DeployAndUpgradeTest is Test {
     ///////////////////////
 
     function testTokenName() public {
-        bytes32 key = keccak256(abi.encodePacked("BoulderTestToken", "BTT"));
-        BTtokens_v1 token = BTtokens_v1(BTtokensEngine_v1(engineProxy).getDeployedTokenProxyAddress(key));
-
         assertEq(token.name(), "BoulderTestToken");
     }
 
     function testTokenSymbol() public {
-        bytes32 key = keccak256(abi.encodePacked("BoulderTestToken", "BTT"));
-        BTtokens_v1 token = BTtokens_v1(BTtokensEngine_v1(engineProxy).getDeployedTokenProxyAddress(key));
-
         assertEq(token.symbol(), "BTT");
     }
 
     function testTokenDecimals() public {
-        bytes32 key = keccak256(abi.encodePacked("BoulderTestToken", "BTT"));
-        BTtokens_v1 token = BTtokens_v1(BTtokensEngine_v1(engineProxy).getDeployedTokenProxyAddress(key));
-
         assertEq(token.decimals(), 6);
     }
 
     function testTokenTotalSupply() public {
-        bytes32 key = keccak256(abi.encodePacked("BoulderTestToken", "BTT"));
-        BTtokens_v1 token = BTtokens_v1(BTtokensEngine_v1(engineProxy).getDeployedTokenProxyAddress(key));
-
         assertEq(token.totalSupply(), 0);
     }
 
     function testTokenManager() public {
-        bytes32 key = keccak256(abi.encodePacked("BoulderTestToken", "BTT"));
-        BTtokens_v1 token = BTtokens_v1(BTtokensEngine_v1(engineProxy).getDeployedTokenProxyAddress(key));
-
         assertEq(token.manager(), tokenManagerAddress);
     }
 
     function testTokenEngine() public {
-        bytes32 key = keccak256(abi.encodePacked("BoulderTestToken", "BTT"));
-        BTtokens_v1 token = BTtokens_v1(BTtokensEngine_v1(engineProxy).getDeployedTokenProxyAddress(key));
-
         assertEq(token.engine(), engineProxy);
     }
 
     function testTokenOwner() public {
-        bytes32 key = keccak256(abi.encodePacked("BoulderTestToken", "BTT"));
-        BTtokens_v1 token = BTtokens_v1(BTtokensEngine_v1(engineProxy).getDeployedTokenProxyAddress(key));
-
         assertEq(token.owner(), initialAdmin);
     }
 
@@ -207,10 +196,6 @@ contract DeployAndUpgradeTest is Test {
     ////////////////////
 
     function testAgentCanMint() public {
-        address testAddress = makeAddr("testAddress");
-        bytes32 key = keccak256(abi.encodePacked("BoulderTestToken", "BTT"));
-        BTtokens_v1 token = BTtokens_v1(BTtokensEngine_v1(engineProxy).getDeployedTokenProxyAddress(key));
-
         vm.startPrank(agent);
         token.mint(testAddress, 1000);
         vm.stopPrank();
@@ -219,10 +204,6 @@ contract DeployAndUpgradeTest is Test {
     }
 
     function testUnauthorizedCanNotMint() public {
-        address testAddress = makeAddr("unauthorized");
-        bytes32 key = keccak256(abi.encodePacked("BoulderTestToken", "BTT"));
-        BTtokens_v1 token = BTtokens_v1(BTtokensEngine_v1(engineProxy).getDeployedTokenProxyAddress(key));
-
         vm.prank(testAddress);
         vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, testAddress));
         token.mint(testAddress, 1000);
@@ -230,10 +211,6 @@ contract DeployAndUpgradeTest is Test {
     }
 
     function testAgentCanNotMintIfEnginePaused() public {
-        address testAddress = makeAddr("testAddress");
-        bytes32 key = keccak256(abi.encodePacked("BoulderTestToken", "BTT"));
-        BTtokens_v1 token = BTtokens_v1(BTtokensEngine_v1(engineProxy).getDeployedTokenProxyAddress(key));
-
         BTtokensEngine_v1(engineProxy).pauseEngine();
 
         vm.startPrank(agent);
@@ -243,10 +220,6 @@ contract DeployAndUpgradeTest is Test {
     }
 
     function testAgentCanNotMintIfAccountBlacklisted() public {
-        address testAddress = makeAddr("testAddress");
-        bytes32 key = keccak256(abi.encodePacked("BoulderTestToken", "BTT"));
-        BTtokens_v1 token = BTtokens_v1(BTtokensEngine_v1(engineProxy).getDeployedTokenProxyAddress(key));
-
         BTtokensEngine_v1(engineProxy).blacklist(testAddress);
 
         vm.startPrank(agent);
@@ -256,10 +229,6 @@ contract DeployAndUpgradeTest is Test {
     }
 
     function testAgentCanBurnIfBlacklisted() public {
-        address testAddress = makeAddr("testAddress");
-        bytes32 key = keccak256(abi.encodePacked("BoulderTestToken", "BTT"));
-        BTtokens_v1 token = BTtokens_v1(BTtokensEngine_v1(engineProxy).getDeployedTokenProxyAddress(key));
-
         vm.startPrank(agent);
         token.mint(testAddress, 1000);
         vm.stopPrank();
@@ -274,10 +243,6 @@ contract DeployAndUpgradeTest is Test {
     }
 
     function testAgentCanNotBurnIfNotBlacklisted() public {
-        address testAddress = makeAddr("testAddress");
-        bytes32 key = keccak256(abi.encodePacked("BoulderTestToken", "BTT"));
-        BTtokens_v1 token = BTtokens_v1(BTtokensEngine_v1(engineProxy).getDeployedTokenProxyAddress(key));
-
         vm.startPrank(agent);
         token.mint(testAddress, 1000);
         vm.stopPrank();
@@ -293,10 +258,6 @@ contract DeployAndUpgradeTest is Test {
     /// @dev When doing this test _update has the modifier whenNotEnginePaused, so it reverts. Removed that modifier
     /// from the _update function to pass this test.
     function testAgentCanBurnIfBlacklistedAndEnginePaused() public {
-        address testAddress = makeAddr("testAddress");
-        bytes32 key = keccak256(abi.encodePacked("BoulderTestToken", "BTT"));
-        BTtokens_v1 token = BTtokens_v1(BTtokensEngine_v1(engineProxy).getDeployedTokenProxyAddress(key));
-
         vm.startPrank(agent);
         token.mint(testAddress, 1000);
         vm.stopPrank();
@@ -314,4 +275,198 @@ contract DeployAndUpgradeTest is Test {
     //////////////////////
     /// Transfer Tests ///
     //////////////////////
+
+    modifier mintTokensToTestAddress() {
+        vm.startPrank(agent);
+        token.mint(testAddress, AMOUNT);
+        vm.stopPrank();
+
+        _;
+    }
+
+    function testCanApproveWhenRequirementsMet() public mintTokensToTestAddress {
+        vm.startPrank(testAddress);
+        token.approve(testAddress2, AMOUNT);
+        vm.stopPrank();
+
+        assertEq(token.allowance(testAddress, testAddress2), AMOUNT);
+    }
+
+    function testCanNotApproveIfEnginePaused() public mintTokensToTestAddress {
+        BTtokensEngine_v1(engineProxy).pauseEngine();
+
+        vm.startPrank(testAddress);
+        vm.expectRevert(BTtokens_v1.BTtokens__EngineIsPaused.selector);
+        token.approve(testAddress2, AMOUNT);
+        vm.stopPrank();
+
+        assertEq(token.allowance(testAddress, testAddress2), 0);
+    }
+
+    function testCanNotApproveIfSenderBlacklisted() public mintTokensToTestAddress {
+        BTtokensEngine_v1(engineProxy).blacklist(testAddress);
+
+        vm.startPrank(testAddress);
+        vm.expectRevert(BTtokens_v1.BTtokens__AccountIsBlacklisted.selector);
+        token.approve(testAddress2, AMOUNT);
+        vm.stopPrank();
+
+        assertEq(token.allowance(testAddress, testAddress2), 0);
+    }
+
+    function testCanNotApproveIfSpenderIsBlacklisted() public mintTokensToTestAddress {
+        BTtokensEngine_v1(engineProxy).blacklist(testAddress2);
+
+        vm.startPrank(testAddress);
+        vm.expectRevert(BTtokens_v1.BTtokens__AccountIsBlacklisted.selector);
+        token.approve(testAddress2, AMOUNT);
+        vm.stopPrank();
+
+        assertEq(token.allowance(testAddress, testAddress2), 0);
+    }
+
+    function testCanTransferFromIfRequirementsMet() public mintTokensToTestAddress {
+        vm.startPrank(testAddress);
+        token.approve(testAddress2, AMOUNT);
+        vm.stopPrank();
+
+        vm.startPrank(testAddress2);
+        token.transferFrom(testAddress, testAddress2, AMOUNT);
+        vm.stopPrank();
+
+        assertEq(token.balanceOf(testAddress), 0);
+        assertEq(token.balanceOf(testAddress2), AMOUNT);
+    }
+
+    function testCanNotTransferFromIfENginePaused() public mintTokensToTestAddress {
+        vm.startPrank(testAddress);
+        token.approve(testAddress2, AMOUNT);
+        vm.stopPrank();
+
+        BTtokensEngine_v1(engineProxy).pauseEngine();
+
+        vm.startPrank(testAddress2);
+        vm.expectRevert(BTtokens_v1.BTtokens__EngineIsPaused.selector);
+        token.transferFrom(testAddress, testAddress2, AMOUNT);
+        vm.stopPrank();
+
+        assertEq(token.balanceOf(testAddress), AMOUNT);
+        assertEq(token.balanceOf(testAddress2), 0);
+    }
+
+    function testCanNotTransferFromIfSenderBlacklisted() public mintTokensToTestAddress {
+        vm.startPrank(testAddress);
+        token.approve(testAddress2, AMOUNT);
+        vm.stopPrank();
+
+        BTtokensEngine_v1(engineProxy).blacklist(testAddress2);
+
+        vm.startPrank(testAddress2);
+        vm.expectRevert(BTtokens_v1.BTtokens__AccountIsBlacklisted.selector);
+        token.transferFrom(testAddress, testAddress3, AMOUNT);
+        vm.stopPrank();
+
+        assertEq(token.balanceOf(testAddress), AMOUNT);
+        assertEq(token.balanceOf(testAddress2), 0);
+    }
+
+    function testCanNotTransferFromIfPayerBlacklisted() public mintTokensToTestAddress {
+        vm.startPrank(testAddress);
+        token.approve(testAddress2, AMOUNT);
+        vm.stopPrank();
+
+        BTtokensEngine_v1(engineProxy).blacklist(testAddress);
+
+        vm.startPrank(testAddress2);
+        vm.expectRevert(BTtokens_v1.BTtokens__AccountIsBlacklisted.selector);
+        token.transferFrom(testAddress, testAddress3, AMOUNT);
+        vm.stopPrank();
+
+        assertEq(token.balanceOf(testAddress), AMOUNT);
+        assertEq(token.balanceOf(testAddress2), 0);
+    }
+
+    function testCanNotTransferFromIfPayeeBlacklisted() public mintTokensToTestAddress {
+        vm.startPrank(testAddress);
+        token.approve(testAddress2, AMOUNT);
+        vm.stopPrank();
+
+        BTtokensEngine_v1(engineProxy).blacklist(testAddress3);
+
+        vm.startPrank(testAddress2);
+        vm.expectRevert(BTtokens_v1.BTtokens__AccountIsBlacklisted.selector);
+        token.transferFrom(testAddress, testAddress3, AMOUNT);
+        vm.stopPrank();
+
+        assertEq(token.balanceOf(testAddress), AMOUNT);
+        assertEq(token.balanceOf(testAddress2), 0);
+    }
+
+    function testCanNotTransferIfEnginePaused() public mintTokensToTestAddress {
+        BTtokensEngine_v1(engineProxy).pauseEngine();
+
+        vm.startPrank(testAddress);
+        vm.expectRevert(BTtokens_v1.BTtokens__EngineIsPaused.selector);
+        token.transfer(testAddress2, AMOUNT);
+        vm.stopPrank();
+
+        assertEq(token.balanceOf(testAddress), AMOUNT);
+        assertEq(token.balanceOf(testAddress2), 0);
+    }
+
+    function testCanNotTransferIfSenderBlacklisted() public mintTokensToTestAddress {
+        BTtokensEngine_v1(engineProxy).blacklist(testAddress);
+
+        vm.startPrank(testAddress);
+        vm.expectRevert(BTtokens_v1.BTtokens__AccountIsBlacklisted.selector);
+        token.transfer(testAddress2, AMOUNT);
+        vm.stopPrank();
+
+        assertEq(token.balanceOf(testAddress), AMOUNT);
+        assertEq(token.balanceOf(testAddress2), 0);
+    }
+
+    function testCanNotTransferIfReceiverBlacklisted() public mintTokensToTestAddress {
+        BTtokensEngine_v1(engineProxy).blacklist(testAddress2);
+
+        vm.startPrank(testAddress);
+        vm.expectRevert(BTtokens_v1.BTtokens__AccountIsBlacklisted.selector);
+        token.transfer(testAddress2, AMOUNT);
+        vm.stopPrank();
+
+        assertEq(token.balanceOf(testAddress), AMOUNT);
+        assertEq(token.balanceOf(testAddress2), 0);
+    }
+
+    /////////////////////
+    /// Upgrade Tests ///
+    /////////////////////
+
+    function testUpgradeTokens() public {
+        BTtokensEngine_v1(engineProxy).pauseEngine();
+        /// @dev this contract is the owner, that's why the engine stops
+
+        vm.startPrank(initialAdmin);
+        /// @dev initialAdmin is the token owner
+
+        BTtokens_v1(tokenAddress).upgradeToAndCall(address(newTokenImplementation), "");
+
+        vm.stopPrank();
+
+        assertEq(BTtokens_v2(tokenAddress).getVersion(), 2);
+    }
+
+    function testUpgradeFailIfEngineNotPaused() public {
+        vm.expectRevert(BTtokens_v1.BTtokens__EngineIsNotPaused.selector);
+        vm.startPrank(initialAdmin);
+        BTtokens_v1(tokenAddress).upgradeToAndCall(address(newTokenImplementation), "");
+        vm.stopPrank();
+    }
+
+    function testUpgradeFailIfUnauthorized() public {
+        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, testAddress));
+        vm.startPrank(testAddress);
+        BTtokens_v1(tokenAddress).upgradeToAndCall(address(newTokenImplementation), "");
+        vm.stopPrank();
+    }
 }

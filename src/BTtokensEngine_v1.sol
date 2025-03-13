@@ -377,7 +377,7 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
      * can authorize an upgrade to a new implementation contract. Should the engine be paused to upgrade?
      * @param _newImplementation The address of the new implementation contract.
      */
-    function _authorizeUpgrade(address _newImplementation) internal virtual override onlyOwner whenNotEnginePaused { }
+    function _authorizeUpgrade(address _newImplementation) internal virtual override onlyOwner whenEnginePaused { }
 
     /**
      * @dev Reserved storage space to allow for layout changes in the future. uint256[50] __gap;
