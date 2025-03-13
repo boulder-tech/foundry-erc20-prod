@@ -46,6 +46,13 @@ contract BTtokens_v1 is UUPSUpgradeable, ERC20Upgradeable, AccessManagedUpgradea
     //////////////////
     //    Events   ///
     //////////////////
+    event TokensMinted(address indexed token, address indexed account, uint256 amount);
+    event TokensBurned(address indexed token, address indexed account, uint256 amount);
+    event TokensApproved(address indexed token, address indexed owner, address indexed spender, uint256 amount);
+    event TransferFrom(
+        address indexed token, address indexed spender, address from, address indexed to, uint256 amount
+    );
+    event TokenTransfer(address indexed token, address indexed from, address indexed to, uint256 amount);
 
     ///////////////////
     //   Modifiers  ///
@@ -132,6 +139,7 @@ contract BTtokens_v1 is UUPSUpgradeable, ERC20Upgradeable, AccessManagedUpgradea
      */
     function mint(address _account, uint256 _amount) public whenNotEnginePaused notBlacklisted(_account) restricted {
         _mint(_account, _amount);
+        emit TokensMinted(address(this), _account, _amount);
     }
 
     /**
@@ -141,6 +149,7 @@ contract BTtokens_v1 is UUPSUpgradeable, ERC20Upgradeable, AccessManagedUpgradea
      */
     function burn(address _account, uint256 _amount) public blacklisted(_account) restricted {
         _burn(_account, _amount);
+        emit TokensBurned(address(this), _account, _amount);
     }
 
     /////////   Supply functions   /////////
@@ -197,6 +206,7 @@ contract BTtokens_v1 is UUPSUpgradeable, ERC20Upgradeable, AccessManagedUpgradea
     {
         address owner = _msgSender();
         _approve(owner, spender, value);
+        emit TokensApproved(address(this), owner, spender, value);
         return true;
     }
 
@@ -226,6 +236,7 @@ contract BTtokens_v1 is UUPSUpgradeable, ERC20Upgradeable, AccessManagedUpgradea
         address spender = _msgSender();
         _spendAllowance(from, spender, value);
         _transfer(from, to, value);
+        emit TransferFrom(address(this), address(msg.sender), from, to, value);
         return true;
     }
 
@@ -249,6 +260,7 @@ contract BTtokens_v1 is UUPSUpgradeable, ERC20Upgradeable, AccessManagedUpgradea
     {
         address owner = _msgSender();
         _transfer(owner, to, value);
+        emit TokenTransfer(address(this), owner, to, value);
         return true;
     }
 

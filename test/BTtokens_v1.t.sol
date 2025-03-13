@@ -197,16 +197,25 @@ contract DeployAndUpgradeTest is Test {
 
     function testAgentCanMint() public {
         vm.startPrank(agent);
-        token.mint(testAddress, 1000);
+        token.mint(testAddress, AMOUNT);
         vm.stopPrank();
 
-        assertEq(token.totalSupply(), 1000);
+        assertEq(token.totalSupply(), AMOUNT);
+    }
+
+    function testEmitEventWhenMint() public {
+        vm.expectEmit(true, false, true, true, address(tokenAddress));
+        emit BTtokens_v1.TokensMinted(address(tokenAddress), address(testAddress), AMOUNT);
+
+        vm.startPrank(agent);
+        token.mint(testAddress, AMOUNT);
+        vm.stopPrank();
     }
 
     function testUnauthorizedCanNotMint() public {
         vm.prank(testAddress);
         vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, testAddress));
-        token.mint(testAddress, 1000);
+        token.mint(testAddress, AMOUNT);
         vm.stopPrank();
     }
 
@@ -215,7 +224,7 @@ contract DeployAndUpgradeTest is Test {
 
         vm.startPrank(agent);
         vm.expectRevert(BTtokens_v1.BTtokens__EngineIsPaused.selector);
-        token.mint(testAddress, 1000);
+        token.mint(testAddress, AMOUNT);
         vm.stopPrank();
     }
 
@@ -224,13 +233,13 @@ contract DeployAndUpgradeTest is Test {
 
         vm.startPrank(agent);
         vm.expectRevert(BTtokens_v1.BTtokens__AccountIsBlacklisted.selector);
-        token.mint(testAddress, 1000);
+        token.mint(testAddress, AMOUNT);
         vm.stopPrank();
     }
 
     function testAgentCanBurnIfBlacklisted() public {
         vm.startPrank(agent);
-        token.mint(testAddress, 1000);
+        token.mint(testAddress, AMOUNT);
         vm.stopPrank();
 
         BTtokensEngine_v1(engineProxy).blacklist(testAddress);
@@ -239,12 +248,27 @@ contract DeployAndUpgradeTest is Test {
         token.burn(testAddress, 500);
         vm.stopPrank();
 
-        assertEq(token.totalSupply(), 500);
+        assertEq(token.totalSupply(), AMOUNT - 500);
+    }
+
+    function testEmitBurnEventIfAgentBurn() public {
+        vm.startPrank(agent);
+        token.mint(testAddress, AMOUNT);
+        vm.stopPrank();
+
+        BTtokensEngine_v1(engineProxy).blacklist(testAddress);
+
+        vm.expectEmit(true, false, true, true, address(tokenAddress));
+        emit BTtokens_v1.TokensBurned(address(tokenAddress), address(testAddress), 500);
+
+        vm.startPrank(agent);
+        token.burn(testAddress, 500);
+        vm.stopPrank();
     }
 
     function testAgentCanNotBurnIfNotBlacklisted() public {
         vm.startPrank(agent);
-        token.mint(testAddress, 1000);
+        token.mint(testAddress, AMOUNT);
         vm.stopPrank();
 
         vm.startPrank(agent);
@@ -252,7 +276,7 @@ contract DeployAndUpgradeTest is Test {
         token.burn(testAddress, 500);
         vm.stopPrank();
 
-        assertEq(token.totalSupply(), 1000);
+        assertEq(token.totalSupply(), AMOUNT);
     }
 
     /// @dev When doing this test _update has the modifier whenNotEnginePaused, so it reverts. Removed that modifier
@@ -290,6 +314,15 @@ contract DeployAndUpgradeTest is Test {
         vm.stopPrank();
 
         assertEq(token.allowance(testAddress, testAddress2), AMOUNT);
+    }
+
+    function testEmitEventWhenApproved() public mintTokensToTestAddress {
+        vm.expectEmit(true, false, true, true, address(tokenAddress));
+        emit BTtokens_v1.TokensApproved(address(tokenAddress), address(testAddress), address(testAddress2), AMOUNT);
+
+        vm.startPrank(testAddress);
+        token.approve(testAddress2, AMOUNT);
+        vm.stopPrank();
     }
 
     function testCanNotApproveIfEnginePaused() public mintTokensToTestAddress {
@@ -336,6 +369,19 @@ contract DeployAndUpgradeTest is Test {
 
         assertEq(token.balanceOf(testAddress), 0);
         assertEq(token.balanceOf(testAddress2), AMOUNT);
+    }
+
+    function testEmitEventIfCanTransferFrom() public mintTokensToTestAddress {
+        vm.startPrank(testAddress);
+        token.approve(testAddress2, AMOUNT);
+        vm.stopPrank();
+
+        vm.expectEmit(true, false, true, true, address(tokenAddress));
+        emit BTtokens_v1.TransferFrom(address(tokenAddress), testAddress, testAddress, testAddress2, AMOUNT);
+
+        vm.startPrank(testAddress2);
+        token.transferFrom(testAddress, testAddress2, AMOUNT);
+        vm.stopPrank();
     }
 
     function testCanNotTransferFromIfENginePaused() public mintTokensToTestAddress {
@@ -400,6 +446,24 @@ contract DeployAndUpgradeTest is Test {
 
         assertEq(token.balanceOf(testAddress), AMOUNT);
         assertEq(token.balanceOf(testAddress2), 0);
+    }
+
+    function testCanTransferIfRequirementsMet() public mintTokensToTestAddress {
+        vm.startPrank(testAddress);
+        token.transfer(testAddress2, AMOUNT);
+        vm.stopPrank();
+
+        assertEq(token.balanceOf(testAddress), 0);
+        assertEq(token.balanceOf(testAddress2), AMOUNT);
+    }
+
+    function testEmitEventIfCanTransfer() public mintTokensToTestAddress {
+        vm.expectEmit(true, false, true, true, address(tokenAddress));
+        emit BTtokens_v1.TokenTransfer(address(tokenAddress), testAddress, testAddress2, AMOUNT);
+
+        vm.startPrank(testAddress);
+        token.transfer(testAddress2, AMOUNT);
+        vm.stopPrank();
     }
 
     function testCanNotTransferIfEnginePaused() public mintTokensToTestAddress {
