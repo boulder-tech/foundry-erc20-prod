@@ -232,7 +232,16 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
      */
     function blacklist(address _account) external onlyOwner notBlacklisted(_account) {
         _blacklist(_account);
-        emit Blacklisted(_account);
+    }
+
+    /**
+     * @notice Adds multiple accounts to blacklist.
+     * @param _accounts The addresses to blacklist.
+     */
+    function batchBlacklist(address[] calldata _accounts) external onlyOwner {
+        for (uint256 i = 0; i < _accounts.length; i++) {
+            _blacklist(_accounts[i]);
+        }
     }
 
     /**
@@ -241,7 +250,16 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
      */
     function unBlacklist(address _account) external onlyOwner blacklisted(_account) {
         _unBlacklist(_account);
-        emit UnBlacklisted(_account);
+    }
+
+    /**
+     * @notice Removes multiple accounts from blacklist.
+     * @param _accounts The addresses to remove from the blacklist.
+     */
+    function batchUnblacklist(address[] calldata _accounts) external onlyOwner {
+        for (uint256 i = 0; i < _accounts.length; i++) {
+            _unBlacklist(_accounts[i]);
+        }
     }
 
     function isBlacklisted(address _account) external view returns (bool) {
@@ -303,10 +321,12 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
 
     function _blacklist(address _account) internal {
         _setBlacklistState(_account, true);
+        emit Blacklisted(_account);
     }
 
     function _unBlacklist(address _account) internal {
         _setBlacklistState(_account, false);
+        emit UnBlacklisted(_account);
     }
 
     /**

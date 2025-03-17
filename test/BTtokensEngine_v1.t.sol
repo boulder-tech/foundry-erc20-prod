@@ -408,6 +408,84 @@ contract DeployAndUpgradeTest is Test {
         vm.stopPrank();
     }
 
+    function testBatchBlacklist() public deployToken {
+        address testAddress = makeAddr("testAddress");
+        address testAddress2 = makeAddr("testAddress2");
+        address testAddress3 = makeAddr("testAddress3");
+
+        address[] memory accounts = new address[](3);
+        accounts[0] = testAddress;
+        accounts[1] = testAddress2;
+        accounts[2] = testAddress3;
+
+        BTtokensEngine_v1(engineProxy).batchBlacklist(accounts);
+
+        assertTrue(BTtokensEngine_v1(engineProxy).isBlacklisted(testAddress));
+        assertTrue(BTtokensEngine_v1(engineProxy).isBlacklisted(testAddress2));
+        assertTrue(BTtokensEngine_v1(engineProxy).isBlacklisted(testAddress3));
+    }
+
+    function testBatchBlacklistFailsIfUnauthorized() public {
+        address unauthorizedUser = makeAddr("unauthorized");
+
+        address testAddress = makeAddr("testAddress");
+        address testAddress2 = makeAddr("testAddress2");
+        address testAddress3 = makeAddr("testAddress3");
+
+        address[] memory accounts = new address[](3);
+        accounts[0] = testAddress;
+        accounts[1] = testAddress2;
+        accounts[2] = testAddress3;
+
+        vm.prank(unauthorizedUser);
+        vm.expectRevert(
+            abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, unauthorizedUser)
+        );
+        BTtokensEngine_v1(engineProxy).batchBlacklist(accounts);
+        vm.stopPrank();
+    }
+
+    function testBatchUnblacklist() public deployToken {
+        address testAddress = makeAddr("testAddress");
+        address testAddress2 = makeAddr("testAddress2");
+        address testAddress3 = makeAddr("testAddress3");
+
+        address[] memory accounts = new address[](3);
+        accounts[0] = testAddress;
+        accounts[1] = testAddress2;
+        accounts[2] = testAddress3;
+
+        BTtokensEngine_v1(engineProxy).batchBlacklist(accounts);
+
+        BTtokensEngine_v1(engineProxy).batchUnblacklist(accounts);
+
+        assertFalse(BTtokensEngine_v1(engineProxy).isBlacklisted(testAddress));
+        assertFalse(BTtokensEngine_v1(engineProxy).isBlacklisted(testAddress2));
+        assertFalse(BTtokensEngine_v1(engineProxy).isBlacklisted(testAddress3));
+    }
+
+    function testBatchUnblacklistFailsIfUnauthorized() public {
+        address unauthorizedUser = makeAddr("unauthorized");
+
+        address testAddress = makeAddr("testAddress");
+        address testAddress2 = makeAddr("testAddress2");
+        address testAddress3 = makeAddr("testAddress3");
+
+        address[] memory accounts = new address[](3);
+        accounts[0] = testAddress;
+        accounts[1] = testAddress2;
+        accounts[2] = testAddress3;
+
+        BTtokensEngine_v1(engineProxy).batchBlacklist(accounts);
+
+        vm.prank(unauthorizedUser);
+        vm.expectRevert(
+            abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, unauthorizedUser)
+        );
+        BTtokensEngine_v1(engineProxy).batchUnblacklist(accounts);
+        vm.stopPrank();
+    }
+
     function testIsBlacklisted() public {
         address testAddress = makeAddr("testAddress");
         assertFalse(BTtokensEngine_v1(engineProxy).isBlacklisted(testAddress));
