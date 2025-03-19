@@ -215,7 +215,7 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
     function setNewTokenImplementationAddress(address newTokenImplementationAddress)
         external
         onlyOwner
-        whenNotEnginePaused
+        whenEnginePaused
         nonZeroAddress(newTokenImplementationAddress)
         nonRepeatedTokenImplementationAddress(newTokenImplementationAddress)
     {

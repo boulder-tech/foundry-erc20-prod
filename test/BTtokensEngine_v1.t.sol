@@ -216,9 +216,13 @@ contract DeployAndUpgradeTest is Test {
     function testSetNewTokenImplementationAddress() public {
         address newImplementation = makeAddr("newImplementation");
 
+        BTtokensEngine_v1(engineProxy).pauseEngine();
+
         vm.startPrank(address(this));
         BTtokensEngine_v1(engineProxy).setNewTokenImplementationAddress(newImplementation);
         vm.stopPrank();
+
+        BTtokensEngine_v1(engineProxy).unPauseEngine();
 
         assertEq(BTtokensEngine_v1(engineProxy).s_tokenImplementationAddress(), newImplementation);
     }
@@ -235,6 +239,7 @@ contract DeployAndUpgradeTest is Test {
     }
 
     function testSetNewTokenImplementationAddressShouldRevertIfZeroAddress() public {
+        BTtokensEngine_v1(engineProxy).pauseEngine();
         vm.expectRevert(BTtokensEngine_v1.BTtokensEngine__AddressCanNotBeZero.selector);
         BTtokensEngine_v1(engineProxy).setNewTokenImplementationAddress(address(0));
     }
@@ -242,26 +247,29 @@ contract DeployAndUpgradeTest is Test {
     function testSetNewTokenImplementationAddressShouldFailIfAlreadyInUse() public {
         address newImplementation = BTtokensEngine_v1(engineProxy).s_tokenImplementationAddress();
 
+        BTtokensEngine_v1(engineProxy).pauseEngine();
         vm.expectRevert(BTtokensEngine_v1.BTtokensEngine__TokenImplementationAlreadyInUse.selector);
         BTtokensEngine_v1(engineProxy).setNewTokenImplementationAddress(newImplementation);
+        BTtokensEngine_v1(engineProxy).unPauseEngine();
     }
 
-    function testSetNewTokenImplementationAddressFailsIfPaused() public {
-        BTtokensEngine_v1(engineProxy).pauseEngine();
-
+    function testSetNewTokenImplementationAddressFailsIfNotPaused() public {
         address newImplementation = makeAddr("newImplementation");
 
-        vm.expectRevert(BTtokensEngine_v1.BTtokensEngine__EnginePaused.selector);
+        vm.expectRevert(BTtokensEngine_v1.BTtokensEngine__EngineNotPaused.selector);
         BTtokensEngine_v1(engineProxy).setNewTokenImplementationAddress(newImplementation);
     }
 
     function testSetNewTokenImplementationAddressEventCheck() public {
         address newImplementation = makeAddr("newImplementation");
 
+        BTtokensEngine_v1(engineProxy).pauseEngine();
+
         vm.expectEmit(true, false, true, true, address(engineProxy));
         emit BTtokensEngine_v1.NewTokenImplementationSet(address(engineProxy), newImplementation);
 
         BTtokensEngine_v1(engineProxy).setNewTokenImplementationAddress(newImplementation);
+        BTtokensEngine_v1(engineProxy).unPauseEngine();
     }
 
     ///////////////////////

@@ -48,6 +48,7 @@ contract DeployAndUpgradeTest is Test {
 
     address initialAdmin = makeAddr("initialAdmin");
     address agent = makeAddr("agent");
+    address tokenOwner = makeAddr("tokenOwner");
 
     address testAddress = makeAddr("testAddress");
     address testAddress2 = makeAddr("testAddress2");
@@ -71,7 +72,6 @@ contract DeployAndUpgradeTest is Test {
         string memory tokenName = "BoulderTestToken";
         string memory tokenSymbol = "BTT";
         address tokenManager = tokenManagerAddress;
-        address tokenOwner = initialAdmin;
         uint8 tokenDecimals = 6;
 
         data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenName, tokenSymbol, tokenDecimals);
@@ -98,7 +98,6 @@ contract DeployAndUpgradeTest is Test {
         string memory tokenName = "";
         string memory tokenSymbol = "BTT";
         address tokenManager = tokenManagerAddress;
-        address tokenOwner = initialAdmin;
         uint8 tokenDecimals = 6;
 
         data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenName, tokenSymbol, tokenDecimals);
@@ -111,7 +110,6 @@ contract DeployAndUpgradeTest is Test {
         string memory tokenName = "BoulderTestToken";
         string memory tokenSymbol = "";
         address tokenManager = tokenManagerAddress;
-        address tokenOwner = initialAdmin;
         uint8 tokenDecimals = 6;
 
         data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenName, tokenSymbol, tokenDecimals);
@@ -124,7 +122,6 @@ contract DeployAndUpgradeTest is Test {
         string memory tokenName = "BoulderTestToken-2";
         string memory tokenSymbol = "BTT-2";
         address tokenManager = tokenManagerAddress;
-        address tokenOwner = initialAdmin;
         uint8 tokenDecimals = 19;
 
         data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenName, tokenSymbol, tokenDecimals);
@@ -137,7 +134,6 @@ contract DeployAndUpgradeTest is Test {
         string memory tokenName = "BoulderTestToken-2";
         string memory tokenSymbol = "BTT-2";
         address tokenManager = tokenManagerAddress;
-        address tokenOwner = initialAdmin;
         uint8 tokenDecimals = 6;
 
         data = abi.encode(address(0), tokenManager, tokenOwner, tokenName, tokenSymbol, tokenDecimals);
@@ -150,7 +146,6 @@ contract DeployAndUpgradeTest is Test {
         string memory tokenName = "BoulderTestToken-2";
         string memory tokenSymbol = "BTT-2";
         address tokenManager = address(0);
-        address tokenOwner = initialAdmin;
         uint8 tokenDecimals = 6;
 
         data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenName, tokenSymbol, tokenDecimals);
@@ -188,7 +183,7 @@ contract DeployAndUpgradeTest is Test {
     }
 
     function testTokenOwner() public {
-        assertEq(token.owner(), initialAdmin);
+        assertEq(token.owner(), tokenOwner);
     }
 
     ////////////////////
@@ -510,8 +505,8 @@ contract DeployAndUpgradeTest is Test {
         BTtokensEngine_v1(engineProxy).pauseEngine();
         /// @dev this contract is the owner, that's why the engine stops
 
-        vm.startPrank(initialAdmin);
-        /// @dev initialAdmin is the token owner
+        vm.startPrank(tokenOwner);
+        /// @dev tokenOwner is the token owner
 
         BTtokens_v1(tokenAddress).upgradeToAndCall(address(newTokenImplementation), "");
 
@@ -522,7 +517,7 @@ contract DeployAndUpgradeTest is Test {
 
     function testUpgradeFailIfEngineNotPaused() public {
         vm.expectRevert(BTtokens_v1.BTtokens__EngineIsNotPaused.selector);
-        vm.startPrank(initialAdmin);
+        vm.startPrank(tokenOwner);
         BTtokens_v1(tokenAddress).upgradeToAndCall(address(newTokenImplementation), "");
         vm.stopPrank();
     }
@@ -532,5 +527,34 @@ contract DeployAndUpgradeTest is Test {
         vm.startPrank(testAddress);
         BTtokens_v1(tokenAddress).upgradeToAndCall(address(newTokenImplementation), "");
         vm.stopPrank();
+    }
+
+    function testTokenVariablesRemainsIfUpgrade() public {
+        vm.startPrank(agent);
+        BTtokens_v1(tokenAddress).mint(testAddress, AMOUNT);
+        vm.stopPrank();
+
+        BTtokensEngine_v1(engineProxy).pauseEngine();
+
+        BTtokensEngine_v1(engineProxy).setNewTokenImplementationAddress(address(newTokenImplementation));
+
+        /// @dev only for robusteness testing, it should be firstly changed on the engine and then used on the token
+        address newImplementationToken = BTtokensEngine_v1(engineProxy).s_tokenImplementationAddress();
+
+        vm.startPrank(tokenOwner);
+        BTtokens_v1(tokenAddress).upgradeToAndCall(address(newImplementationToken), "");
+        vm.stopPrank();
+
+        BTtokensEngine_v1(engineProxy).unPauseEngine();
+
+        assertEq(BTtokens_v2(tokenAddress).name(), "BoulderTestToken");
+        assertEq(BTtokens_v2(tokenAddress).symbol(), "BTT");
+        assertEq(BTtokens_v2(tokenAddress).decimals(), 6);
+        assertEq(BTtokens_v2(tokenAddress).totalSupply(), AMOUNT);
+        assertEq(BTtokens_v2(tokenAddress).manager(), tokenManagerAddress);
+        assertEq(BTtokens_v2(tokenAddress).engine(), engineProxy);
+        assertEq(BTtokens_v2(tokenAddress).owner(), tokenOwner);
+        assertEq(BTtokens_v2(tokenAddress).getVersion(), 2);
+        assertEq(BTtokens_v2(tokenAddress).balanceOf(testAddress), AMOUNT);
     }
 }
