@@ -7,6 +7,7 @@ import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/I
 import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { BTtokens_v1 } from "./BTtokens_v1.sol";
 import { BTtokensManager } from "./BTtokensManager.sol";
 
@@ -18,7 +19,13 @@ contract BTtokenProxy is ERC1967Proxy {
     constructor(address implementation, bytes memory _data) payable ERC1967Proxy(implementation, _data) { }
 }
 
-contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable, PausableUpgradeable {
+contract BTtokensEngine_v1 is
+    Initializable,
+    UUPSUpgradeable,
+    OwnableUpgradeable,
+    PausableUpgradeable,
+    ReentrancyGuard
+{
     ///////////////////
     //    Errors    ///
     ///////////////////
@@ -187,6 +194,7 @@ contract BTtokensEngine_v1 is Initializable, UUPSUpgradeable, OwnableUpgradeable
         onlyOwner
         nonRepeatedNameAndSymbol(tokenName, tokenSymbol)
         whenNotEnginePaused
+        nonReentrant
         returns (address)
     {
         bytes32 salt = keccak256(abi.encodePacked(tokenName, tokenSymbol));

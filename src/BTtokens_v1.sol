@@ -111,7 +111,7 @@ contract BTtokens_v1 is UUPSUpgradeable, ERC20Upgradeable, AccessManagedUpgradea
                 && keccak256(abi.encode(tokenSymbol)) != keccak256(abi.encode("")),
             "invalid argument - empty string"
         );
-        require(0 <= tokenDecimals && tokenDecimals <= 18, "decimals between 0 and 18");
+        require(0 < tokenDecimals && tokenDecimals <= 18, "decimals between 0 and 18");
         require(tokenEngine != address(0), "engine can not be address 0");
         require(tokenManager != address(0), "token manager can not be address 0");
         __ERC20_init(tokenName, tokenSymbol);
