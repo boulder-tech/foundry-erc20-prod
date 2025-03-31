@@ -7,6 +7,8 @@ import { ERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC2
 import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import { ERC20PermitUpgradeable } from
+    "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 import { BTtokensEngine_v1 } from "./BTtokensEngine_v1.sol";
 
 /**
@@ -18,7 +20,13 @@ import { BTtokensEngine_v1 } from "./BTtokensEngine_v1.sol";
  *         to ensure secure and regulated usage within the BoulderTech ecosystem.
  *         The token can be paused, minted, and burned under specific restrictions.
  */
-contract BTtokens_v1 is UUPSUpgradeable, ERC20Upgradeable, AccessManagedUpgradeable, OwnableUpgradeable {
+contract BTtokens_v1 is
+    UUPSUpgradeable,
+    ERC20Upgradeable,
+    AccessManagedUpgradeable,
+    OwnableUpgradeable,
+    ERC20PermitUpgradeable
+{
     ///////////////////
     //    Errors    ///
     ///////////////////
@@ -115,6 +123,7 @@ contract BTtokens_v1 is UUPSUpgradeable, ERC20Upgradeable, AccessManagedUpgradea
         require(tokenEngine != address(0), "engine can not be address 0");
         require(tokenManager != address(0), "token manager can not be address 0");
         __ERC20_init(tokenName, tokenSymbol);
+        __ERC20Permit_init(tokenName);
         __AccessManaged_init(tokenManager);
         __Ownable_init(owner);
         s_engine = tokenEngine;
@@ -150,6 +159,32 @@ contract BTtokens_v1 is UUPSUpgradeable, ERC20Upgradeable, AccessManagedUpgradea
     function burn(address _account, uint256 _amount) public blacklisted(_account) restricted {
         _burn(_account, _amount);
         emit TokensBurned(address(this), _account, _amount);
+    }
+
+    function permitAndTransfer(
+        address owner,
+        address to,
+        uint256 value,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    )
+        external
+        whenNotEnginePaused
+        notBlacklisted(owner)
+        notBlacklisted(to)
+        notBlacklisted(msg.sender)
+    {
+        // Use the permit signature to approve the allowance for msg.sender
+        permit(owner, msg.sender, value, deadline, v, r, s);
+
+        // Perform the transfer using the newly approved allowance
+        _spendAllowance(owner, msg.sender, value);
+        _transfer(owner, to, value);
+
+        // Emit the custom TransferFrom event for tracking
+        emit TransferFrom(address(this), msg.sender, owner, to, value);
     }
 
     /////////   Supply functions   /////////

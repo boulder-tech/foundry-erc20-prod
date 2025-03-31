@@ -10,9 +10,12 @@ import {
     BTtokenProxy,
     PausableUpgradeable
 } from "../src/BTtokensEngine_v1.sol";
-import { BTtokens_v1, AccessManagedUpgradeable } from "../src/BTtokens_v1.sol";
+import { BTtokens_v1, AccessManagedUpgradeable, ERC20PermitUpgradeable } from "../src/BTtokens_v1.sol";
 import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import { BTtokensManager } from "../src/BTtokensManager.sol";
+import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import { ERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 
 contract BTtokens_v2 is BTtokens_v1 {
     /**
@@ -495,6 +498,197 @@ contract DeployAndUpgradeTest is Test {
 
         assertEq(token.balanceOf(testAddress), AMOUNT);
         assertEq(token.balanceOf(testAddress2), 0);
+    }
+
+    ////////////////////
+    /// Permit Tests ///
+    ////////////////////
+
+    function getPermitSignature(
+        address owner,
+        address spender,
+        uint256 value,
+        uint256 deadline,
+        uint256 ownerPrivateKey
+    )
+        internal
+        view
+        returns (uint8 v, bytes32 r, bytes32 s)
+    {
+        uint256 nonce = token.nonces(owner);
+        bytes32 DOMAIN_SEPARATOR = token.DOMAIN_SEPARATOR();
+
+        bytes32 structHash = keccak256(
+            abi.encode(
+                keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"),
+                owner,
+                spender,
+                value,
+                nonce,
+                deadline
+            )
+        );
+
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, structHash));
+        return vm.sign(ownerPrivateKey, digest);
+    }
+
+    function testPermitSetsAllowanceCorrectly() public mintTokensToTestAddress {
+        /// @dev // `makeAddr(...)` generates a pseudo-random address that can't be used for ECDSA signing (no known
+        /// private key)
+        address owner = vm.addr(1);
+        address spender = testAddress2;
+        uint256 value = AMOUNT;
+        uint256 deadline = block.timestamp + 1 days;
+
+        (uint8 v, bytes32 r, bytes32 s) = getPermitSignature(owner, spender, value, deadline, 1); // 1 = owner PK
+
+        vm.prank(spender);
+        token.permit(owner, spender, value, deadline, v, r, s);
+
+        assertEq(token.allowance(owner, spender), value);
+        assertEq(token.nonces(owner), 1);
+    }
+
+    function testPermitFailsWithExpiredSignature() public mintTokensToTestAddress {
+        address owner = vm.addr(1);
+        address spender = testAddress2;
+        uint256 value = AMOUNT;
+        uint256 deadline = block.timestamp - 1; // Expired
+
+        (uint8 v, bytes32 r, bytes32 s) = getPermitSignature(owner, spender, value, deadline, 1); // 1 = owner PK
+
+        vm.prank(spender);
+        vm.expectRevert(abi.encodeWithSelector(ERC20PermitUpgradeable.ERC2612ExpiredSignature.selector, deadline));
+        token.permit(owner, spender, value, deadline, v, r, s);
+    }
+
+    function testPermitFailsWithInvalidSignature() public mintTokensToTestAddress {
+        address owner = vm.addr(1); // Esta es la address esperada
+        address spender = testAddress2;
+        uint256 value = AMOUNT;
+        uint256 deadline = block.timestamp + 1 days;
+
+        /// @dev sign with incorrect private key (pk = 2)
+        (uint8 v, bytes32 r, bytes32 s) = getPermitSignature(owner, spender, value, deadline, 2);
+
+        vm.prank(spender);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ERC20PermitUpgradeable.ERC2612InvalidSigner.selector,
+                vm.addr(2), // signer's address (from pk = 2)
+                owner // expected owner
+            )
+        );
+        token.permit(owner, spender, value, deadline, v, r, s);
+    }
+
+    function testPermitAndTransferFromFlow() public {
+        address owner = vm.addr(1); // Signer
+        address spender = testAddress2; // Spender (transferFrom caller)
+        uint256 value = AMOUNT;
+        uint256 deadline = block.timestamp + 1 days;
+
+        // Mint tokens to owner
+        vm.prank(agent);
+        token.mint(owner, value);
+
+        // Check that spender doesn't have allowance initially
+        assertEq(token.allowance(owner, spender), 0);
+
+        // Sing permit off-chain
+        (uint8 v, bytes32 r, bytes32 s) = getPermitSignature(owner, spender, value, deadline, 1);
+
+        // Spender does permit + transferFrom in 2 txs
+        vm.prank(spender);
+        token.permit(owner, spender, value, deadline, v, r, s);
+
+        vm.prank(spender);
+        token.transferFrom(owner, spender, value);
+
+        // Verificamos que los fondos fueron transferidos correctamente
+        assertEq(token.balanceOf(owner), 0);
+        assertEq(token.balanceOf(spender), value);
+    }
+
+    function testPermitAndTransferSingleCall() public {
+        address owner = vm.addr(1);
+        address spender = testAddress2;
+        uint256 value = AMOUNT;
+        uint256 deadline = block.timestamp + 1 days;
+
+        // Mint tokens to owner
+        vm.prank(agent);
+        token.mint(owner, value);
+
+        // Permit sign
+        (uint8 v, bytes32 r, bytes32 s) = getPermitSignature(owner, spender, value, deadline, 1);
+
+        // spender does all in one tx
+        vm.prank(spender);
+        token.permitAndTransfer(owner, spender, value, deadline, v, r, s);
+
+        assertEq(token.balanceOf(owner), 0);
+        assertEq(token.balanceOf(spender), value);
+    }
+
+    function testPermitAndTransferFailsIfEnginePaused() public {
+        address owner = vm.addr(1);
+        address spender = testAddress2;
+        uint256 value = AMOUNT;
+        uint256 deadline = block.timestamp + 1 days;
+
+        // Mint tokens
+        vm.prank(agent);
+        token.mint(owner, value);
+
+        // Pause engine
+        BTtokensEngine_v1(engineProxy).pauseEngine();
+
+        // Valid signature
+        (uint8 v, bytes32 r, bytes32 s) = getPermitSignature(owner, spender, value, deadline, 1);
+
+        vm.prank(spender);
+        vm.expectRevert(BTtokens_v1.BTtokens__EngineIsPaused.selector);
+        token.permitAndTransfer(owner, spender, value, deadline, v, r, s);
+    }
+
+    function testPermitAndTransferFailsIfOwnerBlacklisted() public {
+        address owner = vm.addr(1);
+        address spender = testAddress2;
+        uint256 value = AMOUNT;
+        uint256 deadline = block.timestamp + 1 days;
+
+        vm.prank(agent);
+        token.mint(owner, value);
+
+        // Blacklist owner
+        BTtokensEngine_v1(engineProxy).blacklist(owner);
+
+        (uint8 v, bytes32 r, bytes32 s) = getPermitSignature(owner, spender, value, deadline, 1);
+
+        vm.prank(spender);
+        vm.expectRevert(BTtokens_v1.BTtokens__AccountIsBlacklisted.selector);
+        token.permitAndTransfer(owner, spender, value, deadline, v, r, s);
+    }
+
+    function testPermitAndTransferFailsIfSpenderBlacklisted() public {
+        address owner = vm.addr(1);
+        address spender = testAddress2;
+        uint256 value = AMOUNT;
+        uint256 deadline = block.timestamp + 1 days;
+
+        vm.prank(agent);
+        token.mint(owner, value);
+
+        // Blacklist spender
+        BTtokensEngine_v1(engineProxy).blacklist(spender);
+
+        (uint8 v, bytes32 r, bytes32 s) = getPermitSignature(owner, spender, value, deadline, 1);
+
+        vm.prank(spender);
+        vm.expectRevert(BTtokens_v1.BTtokens__AccountIsBlacklisted.selector);
+        token.permitAndTransfer(owner, spender, value, deadline, v, r, s);
     }
 
     /////////////////////
