@@ -691,6 +691,28 @@ contract DeployAndUpgradeTest is Test {
         token.permitAndTransfer(owner, spender, value, deadline, v, r, s);
     }
 
+    function testEmitEventPermitAndTransfer() public {
+        address owner = vm.addr(1);
+        address spender = testAddress2;
+        uint256 value = AMOUNT;
+        uint256 deadline = block.timestamp + 1 days;
+
+        // Mint tokens to owner
+        vm.prank(agent);
+        token.mint(owner, value);
+
+        // Generate valid signature
+        (uint8 v, bytes32 r, bytes32 s) = getPermitSignature(owner, spender, value, deadline, 1);
+
+        // Expect the event to be emitted
+        vm.expectEmit(true, true, true, true, address(token));
+        emit BTtokens_v1.PermitAndTransfer(address(token), spender, owner, spender, value, deadline);
+
+        // Execute the function
+        vm.prank(spender);
+        token.permitAndTransfer(owner, spender, value, deadline, v, r, s);
+    }
+
     /////////////////////
     /// Upgrade Tests ///
     /////////////////////

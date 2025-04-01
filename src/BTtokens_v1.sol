@@ -61,6 +61,14 @@ contract BTtokens_v1 is
         address indexed token, address indexed spender, address from, address indexed to, uint256 amount
     );
     event TokenTransfer(address indexed token, address indexed from, address indexed to, uint256 amount);
+    event PermitAndTransfer(
+        address token,
+        address indexed sender,
+        address indexed owner,
+        address indexed to,
+        uint256 value,
+        uint256 deadline
+    );
 
     ///////////////////
     //   Modifiers  ///
@@ -183,6 +191,8 @@ contract BTtokens_v1 is
         _spendAllowance(owner, msg.sender, value);
         _transfer(owner, to, value);
 
+        // Emit the PermitAndTransfer event for tracking
+        emit PermitAndTransfer(address(this), msg.sender, owner, to, value, deadline);
         // Emit the custom TransferFrom event for tracking
         emit TransferFrom(address(this), msg.sender, owner, to, value);
     }
