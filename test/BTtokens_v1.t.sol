@@ -52,6 +52,7 @@ contract DeployAndUpgradeTest is Test {
     address initialAdmin = makeAddr("initialAdmin");
     address agent = makeAddr("agent");
     address tokenOwner = makeAddr("tokenOwner");
+    address tokenHolder = makeAddr("tokenHolder");
 
     address testAddress = makeAddr("testAddress");
     address testAddress2 = makeAddr("testAddress2");
@@ -77,7 +78,7 @@ contract DeployAndUpgradeTest is Test {
         address tokenManager = tokenManagerAddress;
         uint8 tokenDecimals = 6;
 
-        data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenName, tokenSymbol, tokenDecimals);
+        data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenHolder, tokenName, tokenSymbol, tokenDecimals);
 
         tokenAddress = BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
 
@@ -103,7 +104,7 @@ contract DeployAndUpgradeTest is Test {
         address tokenManager = tokenManagerAddress;
         uint8 tokenDecimals = 6;
 
-        data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenName, tokenSymbol, tokenDecimals);
+        data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenHolder, tokenName, tokenSymbol, tokenDecimals);
 
         vm.expectRevert("invalid argument - empty string");
         BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
@@ -115,7 +116,7 @@ contract DeployAndUpgradeTest is Test {
         address tokenManager = tokenManagerAddress;
         uint8 tokenDecimals = 6;
 
-        data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenName, tokenSymbol, tokenDecimals);
+        data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenHolder, tokenName, tokenSymbol, tokenDecimals);
 
         vm.expectRevert("invalid argument - empty string");
         BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
@@ -127,7 +128,7 @@ contract DeployAndUpgradeTest is Test {
         address tokenManager = tokenManagerAddress;
         uint8 tokenDecimals = 19;
 
-        data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenName, tokenSymbol, tokenDecimals);
+        data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenHolder, tokenName, tokenSymbol, tokenDecimals);
 
         vm.expectRevert("decimals between 0 and 18");
         BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
@@ -139,7 +140,7 @@ contract DeployAndUpgradeTest is Test {
         address tokenManager = tokenManagerAddress;
         uint8 tokenDecimals = 6;
 
-        data = abi.encode(address(0), tokenManager, tokenOwner, tokenName, tokenSymbol, tokenDecimals);
+        data = abi.encode(address(0), tokenManager, tokenOwner, tokenHolder, tokenName, tokenSymbol, tokenDecimals);
 
         vm.expectRevert("engine can not be address 0");
         BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
@@ -151,7 +152,7 @@ contract DeployAndUpgradeTest is Test {
         address tokenManager = address(0);
         uint8 tokenDecimals = 6;
 
-        data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenName, tokenSymbol, tokenDecimals);
+        data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenHolder, tokenName, tokenSymbol, tokenDecimals);
 
         vm.expectRevert("token manager can not be address 0");
         BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
@@ -187,6 +188,10 @@ contract DeployAndUpgradeTest is Test {
 
     function testTokenOwner() public {
         assertEq(token.owner(), tokenOwner);
+    }
+
+    function testTokenHolder() public {
+        assertEq(token.s_token_holder(), tokenHolder);
     }
 
     ////////////////////
@@ -277,18 +282,15 @@ contract DeployAndUpgradeTest is Test {
         assertEq(token.totalSupply(), AMOUNT);
     }
 
-    /// @dev When doing this test _update has the modifier whenNotEnginePaused, so it reverts. Removed that modifier
-    /// from the _update function to pass this test.
-    function testAgentCanBurnIfBlacklistedAndEnginePaused() public {
+    function testAgentCanBurnIftokenHolder() public {
         vm.startPrank(agent);
-        token.mint(testAddress, 1000);
+        token.mint(tokenHolder, 1000);
         vm.stopPrank();
 
-        BTtokensEngine_v1(engineProxy).blacklist(testAddress);
-        BTtokensEngine_v1(engineProxy).pauseEngine();
+        BTtokensEngine_v1(engineProxy).blacklist(tokenHolder);
 
         vm.startPrank(agent);
-        token.burn(testAddress, 500);
+        token.burn(tokenHolder, 500);
         vm.stopPrank();
 
         assertEq(token.totalSupply(), 500);

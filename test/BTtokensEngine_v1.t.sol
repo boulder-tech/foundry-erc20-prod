@@ -126,9 +126,11 @@ contract DeployAndUpgradeTest is Test {
         string memory tokenSymbol = "BTT";
         address tokenManager = tokenManagerAddress;
         address tokenOwner = initialAdmin;
+        address tokenHolder = initialAdmin;
         uint8 tokenDecimals = 6;
 
-        bytes memory data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenName, tokenSymbol, tokenDecimals);
+        bytes memory data =
+            abi.encode(engineProxy, tokenManager, tokenOwner, tokenHolder, tokenName, tokenSymbol, tokenDecimals);
 
         /// @dev address(0) on events means that we dont know the address yet
         vm.expectEmit(false, true, true, true, address(engineProxy));
@@ -155,9 +157,11 @@ contract DeployAndUpgradeTest is Test {
         string memory tokenSymbol = "BTT";
         address tokenManager = tokenManagerAddress;
         address tokenOwner = initialAdmin;
+        address tokenHolder = initialAdmin;
         uint8 tokenDecimals = 6;
 
-        bytes memory data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenName, tokenSymbol, tokenDecimals);
+        bytes memory data =
+            abi.encode(engineProxy, tokenManager, tokenOwner, tokenHolder, tokenName, tokenSymbol, tokenDecimals);
 
         BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
 
@@ -168,7 +172,8 @@ contract DeployAndUpgradeTest is Test {
     function testCreateTokenFailsWithoutPermissions() public {
         string memory tokenName = "UnauthorizedToken";
         string memory tokenSymbol = "UTK";
-        bytes memory data = abi.encode(engineProxy, tokenManagerAddress, initialAdmin, tokenName, tokenSymbol, 6);
+        bytes memory data =
+            abi.encode(engineProxy, tokenManagerAddress, initialAdmin, initialAdmin, tokenName, tokenSymbol, 6);
 
         address unauthorizedUser = makeAddr("unauthorized");
 
@@ -185,7 +190,8 @@ contract DeployAndUpgradeTest is Test {
 
         string memory tokenName = "PausedToken";
         string memory tokenSymbol = "PTK";
-        bytes memory data = abi.encode(engineProxy, tokenManagerAddress, initialAdmin, tokenName, tokenSymbol, 6);
+        bytes memory data =
+            abi.encode(engineProxy, tokenManagerAddress, initialAdmin, initialAdmin, tokenName, tokenSymbol, 6);
 
         vm.expectRevert(BTtokensEngine_v1.BTtokensEngine__EnginePaused.selector);
         BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
@@ -281,9 +287,11 @@ contract DeployAndUpgradeTest is Test {
         string memory tokenSymbol = "BTT";
         address tokenManager = tokenManagerAddress;
         address tokenOwner = initialAdmin;
+        address tokenHolder = initialAdmin;
         uint8 tokenDecimals = 6;
 
-        bytes memory data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenName, tokenSymbol, tokenDecimals);
+        bytes memory data =
+            abi.encode(engineProxy, tokenManager, tokenOwner, tokenHolder, tokenName, tokenSymbol, tokenDecimals);
 
         BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
 
@@ -377,9 +385,11 @@ contract DeployAndUpgradeTest is Test {
         string memory tokenSymbol = "BTT-2";
         address tokenManager = tokenManagerAddress;
         address tokenOwner = initialAdmin;
+        address tokenHolder = initialAdmin;
         uint8 tokenDecimals = 6;
 
-        bytes memory data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenName, tokenSymbol, tokenDecimals);
+        bytes memory data =
+            abi.encode(engineProxy, tokenManager, tokenOwner, tokenHolder, tokenName, tokenSymbol, tokenDecimals);
 
         BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
 
@@ -678,9 +688,11 @@ contract DeployAndUpgradeTest is Test {
         string memory tokenSymbol = "BTT";
         address tokenManager = tokenManagerAddress;
         address tokenOwner = initialAdmin;
+        address tokenHolder = initialAdmin;
         uint8 tokenDecimals = 6;
 
-        bytes memory data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenName, tokenSymbol, tokenDecimals);
+        bytes memory data =
+            abi.encode(engineProxy, tokenManager, tokenOwner, tokenHolder, tokenName, tokenSymbol, tokenDecimals);
 
         vm.expectEmit(false, true, true, true, address(engineProxy));
         emit BTtokensEngine_v1.MinterRoleSet(address(0), address(agent));
