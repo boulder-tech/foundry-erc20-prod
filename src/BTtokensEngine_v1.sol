@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import { console2 } from "forge-std/Test.sol";
-import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
-import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import { BTtokens_v1 } from "./BTtokens_v1.sol";
-import { BTtokensManager } from "./BTtokensManager.sol";
+// import { console2 } from "forge-std/Test.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {BTtokens_v1} from "./BTtokens_v1.sol";
+import {BTtokensManager} from "./BTtokensManager.sol";
 
 /**
  * @dev
  * UUPSUpgradeable contract, renamed as BTtokenProxy.
  */
 contract BTtokenProxy is ERC1967Proxy {
-    constructor(address implementation, bytes memory _data) payable ERC1967Proxy(implementation, _data) { }
+    constructor(address implementation, bytes memory _data) payable ERC1967Proxy(implementation, _data) {}
 }
 
 contract BTtokensEngine_v1 is
@@ -152,11 +152,7 @@ contract BTtokensEngine_v1 is
         _disableInitializers();
     }
 
-    function initialize(
-        address initialOwner,
-        address tokenImplementationAddress,
-        address accessManagerAddress
-    )
+    function initialize(address initialOwner, address tokenImplementationAddress, address accessManagerAddress)
         public
         initializer
         nonZeroAddress(initialOwner)
@@ -184,12 +180,7 @@ contract BTtokensEngine_v1 is
      * @param tokenName Token Name
      * @param tokenSymbol Token Symbol
      */
-    function createToken(
-        string memory tokenName,
-        string memory tokenSymbol,
-        bytes memory data,
-        address agent
-    )
+    function createToken(string memory tokenName, string memory tokenSymbol, bytes memory data, address agent)
         external
         onlyOwner
         nonRepeatedNameAndSymbol(tokenName, tokenSymbol)
@@ -199,7 +190,7 @@ contract BTtokensEngine_v1 is
     {
         bytes32 salt = keccak256(abi.encodePacked(tokenName, tokenSymbol));
 
-        BTtokenProxy newProxyToken = new BTtokenProxy{ salt: salt }(
+        BTtokenProxy newProxyToken = new BTtokenProxy{salt: salt}(
             address(s_tokenImplementationAddress), abi.encodeWithSignature("initialize(bytes)", data)
         );
 
@@ -405,7 +396,7 @@ contract BTtokensEngine_v1 is
      * can authorize an upgrade to a new implementation contract. Should the engine be paused to upgrade?
      * @param _newImplementation The address of the new implementation contract.
      */
-    function _authorizeUpgrade(address _newImplementation) internal virtual override onlyOwner whenEnginePaused { }
+    function _authorizeUpgrade(address _newImplementation) internal virtual override onlyOwner whenEnginePaused {}
 
     /**
      * @dev Reserved storage space to allow for layout changes in the future. uint256[50] __gap;

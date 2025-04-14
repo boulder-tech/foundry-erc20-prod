@@ -45,6 +45,7 @@ contract BTtokens_v1 is
 
     address public s_engine;
     address public s_manager;
+    address public s_token_holder;
     string public s_name;
     string public s_symbol;
     uint8 public s_decimals;
@@ -73,13 +74,6 @@ contract BTtokens_v1 is
     ///////////////////
     //   Modifiers  ///
     ///////////////////
-
-    modifier blacklisted(address account) {
-        if (!BTtokensEngine_v1(s_engine).isBlacklisted(account)) {
-            revert BTtokens__AccountIsNotBlacklisted();
-        }
-        _;
-    }
 
     modifier notBlacklisted(address account) {
         if (BTtokensEngine_v1(s_engine).isBlacklisted(account)) {
@@ -116,10 +110,11 @@ contract BTtokens_v1 is
             address tokenEngine,
             address tokenManager,
             address owner,
+            address tokenHolder,
             string memory tokenName,
             string memory tokenSymbol,
             uint8 tokenDecimals
-        ) = abi.decode(data, (address, address, address, string, string, uint8));
+        ) = abi.decode(data, (address, address, address, address, string, string, uint8));
 
         require(!s_initialized, "Token: contract is already initialized");
         require(
@@ -136,6 +131,7 @@ contract BTtokens_v1 is
         __Ownable_init(owner);
         s_engine = tokenEngine;
         s_manager = tokenManager;
+        s_token_holder = tokenHolder;
         s_name = tokenName;
         s_symbol = tokenSymbol;
         s_decimals = tokenDecimals;
@@ -164,11 +160,38 @@ contract BTtokens_v1 is
      * @param _account The address to burn tokens from.
      * @param _amount The amount of tokens to burn.
      */
-    function burn(address _account, uint256 _amount) public blacklisted(_account) restricted {
-        _burn(_account, _amount);
-        emit TokensBurned(address(this), _account, _amount);
+    function burn(address _account, uint256 _amount) public restricted {
+        if (_account == s_token_holder || BTtokensEngine_v1(s_engine).isBlacklisted(_account)) {
+            _burn(_account, _amount);
+            emit TokensBurned(address(this), _account, _amount);
+        } else {
+            revert BTtokens__AccountIsNotBlacklisted();
+        }
     }
 
+    /**
+     * @notice Executes a gasless approval and transfer in a single transaction using EIP-2612 `permit`.
+     * @dev Uses `permit` to approve `msg.sender` to spend `value` tokens on behalf of `owner`,
+     *      then immediately transfers those tokens to `to`.
+     *      This function also emits custom tracking events for monitoring purposes.
+     *
+     * Requirements:
+     * - The contract must not be paused (`whenNotEnginePaused`).
+     * - `owner`, `to`, and `msg.sender` must not be blacklisted.
+     * - The `permit` signature must be valid and not expired.
+     *
+     * @param owner The address of the token holder granting the allowance.
+     * @param to The recipient of the tokens.
+     * @param value The amount of tokens to be transferred.
+     * @param deadline The timestamp by which the permit must be used.
+     * @param v The recovery byte of the signature.
+     * @param r Half of the ECDSA signature pair.
+     * @param s Half of the ECDSA signature pair.
+     *
+     * Emits:
+     * - `PermitAndTransfer` for off-chain tracking of combined operations.
+     * - `TransferFrom` for compatibility and monitoring.
+     */
     function permitAndTransfer(
         address owner,
         address to,
