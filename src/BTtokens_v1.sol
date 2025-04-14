@@ -30,6 +30,8 @@ contract BTtokens_v1 is
     ///////////////////
     //    Errors    ///
     ///////////////////
+    error BTtokens__AddressCanNotBeZero();
+    error BTtokens__StringCanNotBeEmpty();
     error BTtokens__AccountIsBlacklisted();
     error BTtokens__AccountIsNotBlacklisted();
     error BTtokens__EngineIsNotPaused();
@@ -74,6 +76,20 @@ contract BTtokens_v1 is
     ///////////////////
     //   Modifiers  ///
     ///////////////////
+
+    modifier nonZeroAddress(address addr) {
+        if (addr == address(0)) {
+            revert BTtokens__AddressCanNotBeZero();
+        }
+        _;
+    }
+
+    modifier nonEmptyString(string memory str) {
+        if (keccak256(abi.encode(str)) == keccak256(abi.encode(""))) {
+            revert BTtokens__StringCanNotBeEmpty();
+        }
+        _;
+    }
 
     modifier notBlacklisted(address account) {
         if (BTtokensEngine_v1(s_engine).isBlacklisted(account)) {
@@ -252,6 +268,21 @@ contract BTtokens_v1 is
     }
 
     ////////   Getters functions   /////////
+    ////////   Setters functions   /////////
+
+    function setName(string memory _name) public onlyOwner nonEmptyString(_name) {
+        s_name = _name;
+    }
+
+    function setSymbol(string memory _symbol) public onlyOwner nonEmptyString(_symbol) {
+        s_symbol = _symbol;
+    }
+
+    function setTokenHolder(address tokenHolder) public onlyOwner nonZeroAddress(tokenHolder) {
+        s_token_holder = tokenHolder;
+    }
+
+    ////////   Setters functions   /////////
     ////////  Transfers functions  /////////
 
     /**
