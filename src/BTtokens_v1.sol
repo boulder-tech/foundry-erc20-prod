@@ -36,6 +36,7 @@ contract BTtokens_v1 is
     error BTtokens__AccountIsNotBlacklisted();
     error BTtokens__EngineIsNotPaused();
     error BTtokens__EngineIsPaused();
+    error BTtokens__OnlyEngineCanCall();
 
     ///////////////////
     //     Types    ///
@@ -108,6 +109,13 @@ contract BTtokens_v1 is
     modifier whenNotEnginePaused() {
         if (BTtokensEngine_v1(s_engine).isEnginePaused()) {
             revert BTtokens__EngineIsPaused();
+        }
+        _;
+    }
+
+    modifier onlyEngine() {
+        if (msg.sender != s_engine) {
+            revert BTtokens__OnlyEngineCanCall();
         }
         _;
     }
@@ -270,11 +278,16 @@ contract BTtokens_v1 is
     ////////   Getters functions   /////////
     ////////   Setters functions   /////////
 
-    function setName(string memory _name) public onlyOwner nonEmptyString(_name) {
+    function setNameAndSymbol(
+        string memory _name,
+        string memory _symbol
+    )
+        public
+        onlyEngine
+        nonEmptyString(_name)
+        nonEmptyString(_symbol)
+    {
         s_name = _name;
-    }
-
-    function setSymbol(string memory _symbol) public onlyOwner nonEmptyString(_symbol) {
         s_symbol = _symbol;
     }
 

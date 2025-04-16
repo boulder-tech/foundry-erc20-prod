@@ -81,6 +81,14 @@ contract BTtokensEngine_v1 is
     event BurnerRoleSet(address indexed tokenProxyAddress, address indexed agent);
     event EnginePaused(address indexed engine);
     event EngineUnpaused(address indexed engine);
+    event TokenNameAndSymbolChanged(
+        address indexed engine,
+        address indexed tokenProxyAddress,
+        string name,
+        string symbol,
+        string newTokenName,
+        string newTokenSymbol
+    );
 
     ///////////////////
     //   Modifiers  ///
@@ -229,6 +237,36 @@ contract BTtokensEngine_v1 is
     {
         s_tokenImplementationAddress = newTokenImplementationAddress;
         emit NewTokenImplementationSet(address(this), s_tokenImplementationAddress);
+    }
+
+    function changeTokenNameAndSymbol(
+        string memory tokenName,
+        string memory tokenSymbol,
+        string memory newTokenName,
+        string memory newTokenSymbol
+    )
+        external
+        onlyOwner
+        nonRepeatedNameAndSymbol(newTokenName, newTokenSymbol)
+    {
+        bytes32 key = keccak256(abi.encodePacked(tokenName, tokenSymbol));
+        if (s_deployedTokens[key] == address(0)) {
+            revert BTtokensEngine__TokenNotDeployed();
+        }
+        address tokenAddress = s_deployedTokens[key];
+        _removeToken(key);
+
+        bytes32 newKey = keccak256(abi.encodePacked(newTokenName, newTokenSymbol));
+        s_deployedTokens[newKey] = tokenAddress;
+        s_deployedTokensKeys.push(newKey);
+
+        BTtokens_v1 c_token = BTtokens_v1(s_deployedTokens[newKey]);
+
+        c_token.setNameAndSymbol(newTokenName, newTokenSymbol);
+
+        emit TokenNameAndSymbolChanged(
+            address(this), tokenAddress, tokenName, tokenSymbol, newTokenName, newTokenSymbol
+        );
     }
 
     /////////   Admin functions   /////////
@@ -398,6 +436,24 @@ contract BTtokensEngine_v1 is
     }
 
     ///////// Set roles functions /////////
+    /////////   Admin functions   /////////
+
+    function _removeToken(bytes32 salt) internal {
+        /// @dev remove salt from mapping
+        delete s_deployedTokens[salt];
+
+        /// @dev swap-and-pop
+        uint256 len = s_deployedTokensKeys.length;
+        for (uint256 i = 0; i < len; i++) {
+            if (s_deployedTokensKeys[i] == salt) {
+                s_deployedTokensKeys[i] = s_deployedTokensKeys[len - 1];
+                s_deployedTokensKeys.pop();
+                break;
+            }
+        }
+    }
+
+    /////////   Admin functions   /////////
     /////////  Upgrade functions  /////////
 
     /**

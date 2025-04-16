@@ -198,35 +198,11 @@ contract DeployAndUpgradeTest is Test {
     /// Setters Tests ///
     /////////////////////
 
-    function testSetName() public {
-        vm.prank(tokenOwner);
-        token.setName("NuevoNombre");
-        assertEq(token.name(), "NuevoNombre");
-    }
-
-    function testSetSymbol() public {
-        vm.prank(tokenOwner);
-        token.setSymbol("NN");
-        assertEq(token.symbol(), "NN");
-    }
-
     function testSetTokenHolder() public {
         address newHolder = address(0xABCD);
         vm.prank(tokenOwner);
         token.setTokenHolder(newHolder);
         assertEq(token.s_token_holder(), newHolder);
-    }
-
-    function testSetNameRevertsIfEmpty() public {
-        vm.prank(tokenOwner);
-        vm.expectRevert(BTtokens_v1.BTtokens__StringCanNotBeEmpty.selector);
-        token.setName("");
-    }
-
-    function testSetSymbolRevertsIfEmpty() public {
-        vm.prank(tokenOwner);
-        vm.expectRevert(BTtokens_v1.BTtokens__StringCanNotBeEmpty.selector);
-        token.setSymbol("");
     }
 
     function testSetTokenHolderRevertsIfZeroAddress() public {
@@ -236,14 +212,6 @@ contract DeployAndUpgradeTest is Test {
     }
 
     function testSettersFailIfNotOwner() public {
-        vm.prank(address(0x999)); // no owner
-        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, address(0x999)));
-        token.setName("FAIL");
-
-        vm.prank(address(0x999));
-        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, address(0x999)));
-        token.setSymbol("FAIL");
-
         vm.prank(address(0x999));
         vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, address(0x999)));
         token.setTokenHolder(address(0x999));
