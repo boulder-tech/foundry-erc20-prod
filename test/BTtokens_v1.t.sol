@@ -80,7 +80,7 @@ contract DeployAndUpgradeTest is Test {
 
         data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenHolder, tokenName, tokenSymbol, tokenDecimals);
 
-        tokenAddress = BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
+        tokenAddress = BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent, tokenOwner);
 
         token = BTtokens_v1(tokenAddress);
     }
@@ -107,7 +107,7 @@ contract DeployAndUpgradeTest is Test {
         data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenHolder, tokenName, tokenSymbol, tokenDecimals);
 
         vm.expectRevert("invalid argument - empty string");
-        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
+        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent, tokenOwner);
     }
 
     function testCanNotInitializeWithEmptySymbol() public {
@@ -119,7 +119,7 @@ contract DeployAndUpgradeTest is Test {
         data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenHolder, tokenName, tokenSymbol, tokenDecimals);
 
         vm.expectRevert("invalid argument - empty string");
-        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
+        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent, tokenOwner);
     }
 
     function testCanNotInitializeWithInvalidDecimals() public {
@@ -131,7 +131,7 @@ contract DeployAndUpgradeTest is Test {
         data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenHolder, tokenName, tokenSymbol, tokenDecimals);
 
         vm.expectRevert("decimals between 0 and 18");
-        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
+        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent, tokenOwner);
     }
 
     function testCanNotInitializeWhenEngineIsZeroAddress() public {
@@ -143,7 +143,7 @@ contract DeployAndUpgradeTest is Test {
         data = abi.encode(address(0), tokenManager, tokenOwner, tokenHolder, tokenName, tokenSymbol, tokenDecimals);
 
         vm.expectRevert("engine can not be address 0");
-        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
+        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent, tokenOwner);
     }
 
     function testCanNotInitializeWhenTokenManagerIsZeroAddress() public {
@@ -155,7 +155,7 @@ contract DeployAndUpgradeTest is Test {
         data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenHolder, tokenName, tokenSymbol, tokenDecimals);
 
         vm.expectRevert("token manager can not be address 0");
-        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
+        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent, tokenOwner);
     }
 
     ///////////////////////

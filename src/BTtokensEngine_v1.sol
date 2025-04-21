@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-// import { console2 } from "forge-std/Test.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -196,7 +195,8 @@ contract BTtokensEngine_v1 is
         string memory tokenName,
         string memory tokenSymbol,
         bytes memory data,
-        address agent
+        address tokenAgent,
+        address tokenOwner
     )
         external
         onlyOwner
@@ -214,8 +214,10 @@ contract BTtokensEngine_v1 is
         s_deployedTokens[salt] = address(newProxyToken);
         s_deployedTokensKeys.push(salt);
 
-        _setMinterRole(address(newProxyToken), agent);
-        _setBurnerRole(address(newProxyToken), agent);
+        _setMinterRole(address(newProxyToken), tokenAgent);
+        _setMinterRole(address(newProxyToken), tokenOwner);
+        _setBurnerRole(address(newProxyToken), tokenAgent);
+        _setMinterRole(address(newProxyToken), tokenOwner);
 
         emit TokenCreated(address(this), address(newProxyToken), tokenName, tokenSymbol);
         return address(newProxyToken);

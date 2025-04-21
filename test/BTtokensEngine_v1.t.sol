@@ -142,7 +142,7 @@ contract DeployAndUpgradeTest is Test {
         vm.expectEmit(true, false, true, true, address(engineProxy));
         emit BTtokensEngine_v1.TokenCreated(address(engineProxy), address(0), tokenName, tokenSymbol);
 
-        address newToken = BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
+        address newToken = BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent, tokenOwner);
 
         assertTrue(newToken != address(0));
 
@@ -163,15 +163,16 @@ contract DeployAndUpgradeTest is Test {
         bytes memory data =
             abi.encode(engineProxy, tokenManager, tokenOwner, tokenHolder, tokenName, tokenSymbol, tokenDecimals);
 
-        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
+        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent, tokenOwner);
 
         vm.expectRevert(BTtokensEngine_v1.BTtokensEngine__TokenNameAndSymbolAlreadyInUsed.selector);
-        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
+        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent, tokenOwner);
     }
 
     function testCreateTokenFailsWithoutPermissions() public {
         string memory tokenName = "UnauthorizedToken";
         string memory tokenSymbol = "UTK";
+        address tokenOwner = initialAdmin;
         bytes memory data =
             abi.encode(engineProxy, tokenManagerAddress, initialAdmin, initialAdmin, tokenName, tokenSymbol, 6);
 
@@ -181,7 +182,7 @@ contract DeployAndUpgradeTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, unauthorizedUser)
         );
-        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, unauthorizedUser);
+        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, unauthorizedUser, tokenOwner);
         vm.stopPrank();
     }
 
@@ -190,11 +191,12 @@ contract DeployAndUpgradeTest is Test {
 
         string memory tokenName = "PausedToken";
         string memory tokenSymbol = "PTK";
+        address tokenOwner = initialAdmin;
         bytes memory data =
             abi.encode(engineProxy, tokenManagerAddress, initialAdmin, initialAdmin, tokenName, tokenSymbol, 6);
 
         vm.expectRevert(BTtokensEngine_v1.BTtokensEngine__EnginePaused.selector);
-        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
+        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent, tokenOwner);
     }
 
     function testGrantAndRevokeRoles() public {
@@ -293,7 +295,7 @@ contract DeployAndUpgradeTest is Test {
         bytes memory data =
             abi.encode(engineProxy, tokenManager, tokenOwner, tokenHolder, tokenName, tokenSymbol, tokenDecimals);
 
-        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
+        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent, tokenOwner);
 
         _;
     }
@@ -391,7 +393,7 @@ contract DeployAndUpgradeTest is Test {
         bytes memory data =
             abi.encode(engineProxy, tokenManager, tokenOwner, tokenHolder, tokenName, tokenSymbol, tokenDecimals);
 
-        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
+        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent, tokenOwner);
 
         address testAddress = makeAddr("testAddress");
         address testAddress2 = makeAddr("testAddress2");
@@ -599,10 +601,11 @@ contract DeployAndUpgradeTest is Test {
 
         string memory tokenName = "PausedToken";
         string memory tokenSymbol = "PTK";
+        address tokenOwner = initialAdmin;
         bytes memory data = abi.encode(engineProxy, tokenManagerAddress, initialAdmin, tokenName, tokenSymbol, 6);
 
         vm.expectRevert(BTtokensEngine_v1.BTtokensEngine__EnginePaused.selector);
-        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
+        BTtokensEngine_v1(engineProxy).createToken(tokenName, tokenSymbol, data, agent, tokenOwner);
     }
 
     function testUnpauseEngineFailsIfNotPaused() public {
@@ -703,7 +706,7 @@ contract DeployAndUpgradeTest is Test {
         vm.expectEmit(true, false, true, true, address(engineProxy));
         emit BTtokensEngine_v1.TokenCreated(address(engineProxy), address(0), tokenName, tokenSymbol);
 
-        address newToken = BTtokensEngine_v2(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
+        address newToken = BTtokensEngine_v2(engineProxy).createToken(tokenName, tokenSymbol, data, agent, tokenOwner);
 
         assertTrue(newToken != address(0));
 
@@ -723,6 +726,6 @@ contract DeployAndUpgradeTest is Test {
         bytes memory data = abi.encode(engineProxy, tokenManager, tokenOwner, tokenName, tokenSymbol, tokenDecimals);
 
         vm.expectRevert(BTtokensEngine_v1.BTtokensEngine__TokenNameAndSymbolAlreadyInUsed.selector);
-        BTtokensEngine_v2(engineProxy).createToken(tokenName, tokenSymbol, data, agent);
+        BTtokensEngine_v2(engineProxy).createToken(tokenName, tokenSymbol, data, agent, tokenOwner);
     }
 }
