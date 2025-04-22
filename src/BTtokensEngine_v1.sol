@@ -217,7 +217,7 @@ contract BTtokensEngine_v1 is
         _setMinterRole(address(newProxyToken), tokenAgent);
         _setMinterRole(address(newProxyToken), tokenOwner);
         _setBurnerRole(address(newProxyToken), tokenAgent);
-        _setMinterRole(address(newProxyToken), tokenOwner);
+        _setBurnerRole(address(newProxyToken), tokenOwner);
 
         emit TokenCreated(address(this), address(newProxyToken), tokenName, tokenSymbol);
         return address(newProxyToken);
