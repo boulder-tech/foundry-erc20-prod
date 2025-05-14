@@ -16,7 +16,7 @@ interface IVestingWalletClone {
 
 /**
  * @title BTvestingCliffWalletFactory
- * @notice Factory to create clones of VestingWallet with cliff using plugin-style input
+ * @notice Factory to create clones of VestingWallet with cliff
  */
 contract BTvestingCliffWalletFactory is Ownable {
     ///////////////////
