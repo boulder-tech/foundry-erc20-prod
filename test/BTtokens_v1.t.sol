@@ -310,14 +310,14 @@ contract DeployAndUpgradeTest is Test {
         token.mint(tokenHolder, 1000);
         vm.stopPrank();
 
-        BTtokensEngine_v1(engineProxy).blacklist(tokenHolder);
-
         vm.startPrank(agent);
         token.burn(tokenHolder, 500);
         vm.stopPrank();
 
         assertEq(token.totalSupply(), 500);
     }
+
+    // Add test to test if an agent of another token can not mint/burn to other token.
 
     //////////////////////
     /// Transfer Tests ///
