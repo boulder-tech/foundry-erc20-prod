@@ -50,6 +50,8 @@ contract BTtokensEngine_v1 is
     mapping(address => bool) public s_blacklist;
     /// @dev Array to keep track of deployed tokens
     mapping(bytes32 => address) public s_deployedTokens;
+    /// @dev Array to track access manager for deployed tokens
+    mapping(bytes32 => address) public s_accessManagerForDeployedTokens;
 
     address public s_tokenImplementationAddress;
     address public s_accessManagerAddress;
@@ -87,6 +89,12 @@ contract BTtokensEngine_v1 is
         string symbol,
         string newTokenName,
         string newTokenSymbol
+    );
+    event AccessManagerChanged(
+        address indexed engine,
+        address indexed oldAccessManager,
+        address indexed newAccessManager,
+        address indexed tokenProxyAddress
     );
 
     ///////////////////
@@ -214,6 +222,29 @@ contract BTtokensEngine_v1 is
         s_deployedTokens[salt] = address(newProxyToken);
         s_deployedTokensKeys.push(salt);
 
+        (
+            address tokenEngine,
+            address tokenManager,
+            address owner,
+            address tokenHolder,
+            string memory tokenName,
+            string memory tokenSymbol,
+            uint8 tokenDecimals
+        ) = abi.decode(data, (address, address, address, address, string, string, uint8));
+
+        s_accessManagerForDeployedTokens[salt] = tokenManager;
+
+        /**
+         * @notice If the token manager is different from the engine's access manager, we need to update the engine's
+         * access manager.
+         * @param tokenManager The address of the token manager.
+         * @param tokenProxyAddress The address of the token proxy.
+         */
+        if (tokenManager != s_accessManagerAddress) {
+            s_accessManagerAddress = tokenManager;
+            emit AccessManagerChanged(address(this), s_accessManagerAddress, tokenManager, tokenProxyAddress);
+        }
+
         _setMinterRole(address(newProxyToken), tokenAgent);
         _setMinterRole(address(newProxyToken), tokenOwner);
         _setBurnerRole(address(newProxyToken), tokenAgent);
@@ -315,6 +346,26 @@ contract BTtokensEngine_v1 is
     }
 
     ///////// Blacklist functions /////////
+    ///////// Assign role functions ///////
+    /**
+     * @notice Assigns the minter role to an agent.
+     * @param tokenProxyAddress The address of the token proxy.
+     * @param agent The address of the agent.
+     */
+    function assignMinterRole(address tokenProxyAddress, address agent) external onlyOwner {
+        _setMinterRole(tokenProxyAddress, agent);
+    }
+
+    /**
+     * @notice Assigns the burner role to an agent.
+     * @param tokenProxyAddress The address of the token proxy.
+     * @param agent The address of the agent.
+     */
+    function assignBurnerRole(address tokenProxyAddress, address agent) external onlyOwner {
+        _setBurnerRole(tokenProxyAddress, agent);
+    }
+
+    ///////// Assign role functions ///////
     /////////   Pause functions   /////////
 
     /**
@@ -359,6 +410,14 @@ contract BTtokensEngine_v1 is
      */
     function getVersion() external pure virtual returns (uint16) {
         return 1;
+    }
+
+    /**
+     * @notice Returns the access manager for a deployed token.
+     * @param key Bytes32 key to get the token proxy address
+     */
+    function getAccessManagerForDeployedToken(bytes32 key) external view nonTokenDeployed(key) returns (address) {
+        return s_accessManagerForDeployedTokens[key];
     }
 
     /////////////////////////
