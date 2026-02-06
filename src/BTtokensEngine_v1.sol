@@ -199,12 +199,19 @@ contract BTtokensEngine_v1 is
     /////////////////////////
 
     /**
-     * @notice This function deploys an UUPS proxy for the token implementation
-     * @param data data needed to initialize token implementation.
-     * Data should be something like:
-     * bytes memory data = abi.encode(engine,tokenManager,tokenOwner,tokenHolder,tokenName,tokenSymbol,tokenDecimals)
-     * @param tokenName Token Name
-     * @param tokenSymbol Token Symbol
+     * @notice Deploys a UUPS proxy for the token implementation.
+     * @param data Opaque data for token initialization. The engine does not decode it; the token expects
+     *             abi.encode(engine, tokenManager, owner, tokenHolder, tokenName, tokenSymbol, tokenDecimals).
+     * @param tokenName Token name.
+     * @param tokenSymbol Token symbol.
+     * @param tokenAgent Address to assign minter and burner roles. When using Boulder's access manager
+     *                   (s_boulderAccessManagerAddress), this can be Boulder's standard agent; the same
+     *                   address can be reused across all tokens that share that manager.
+     * @param tokenOwner Address to assign minter and burner roles. When using Boulder's manager, this can
+     *                   be Boulder's standard owner; same address reusable across tokens with that manager.
+     * @dev When the token uses Boulder's default manager, tokenAgent and tokenOwner typically refer to
+     *      Boulder's common agents. No distinct owner/agent per token is required in that case; the params
+     *      are still required but can be the same for each deployment.
      */
     function createToken(
         string memory tokenName,
