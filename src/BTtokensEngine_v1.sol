@@ -54,7 +54,7 @@ contract BTtokensEngine_v1 is
     mapping(bytes32 => address) public s_accessManagerForDeployedTokens;
 
     address public s_tokenImplementationAddress;
-    address public s_accessManagerAddress;
+    address public s_boulderAccessManagerAddress;
     bool public s_initialized;
     bool public s_enginePaused = true;
     bytes32[] public s_deployedTokensKeys;
@@ -90,11 +90,12 @@ contract BTtokensEngine_v1 is
         string newTokenName,
         string newTokenSymbol
     );
+    event AccessManagerSet(address indexed engine, address indexed accessManager, address indexed tokenProxyAddress);
     event AccessManagerChanged(
         address indexed engine,
-        address indexed oldAccessManager,
-        address indexed newAccessManager,
-        address indexed tokenProxyAddress
+        address indexed tokenProxyAddress,
+        address oldAccessManager,
+        address indexed newAccessManager
     );
 
     ///////////////////
@@ -167,6 +168,12 @@ contract BTtokensEngine_v1 is
         _disableInitializers();
     }
 
+    /**
+     * @notice Initializes the engine.
+     * @param initialOwner The address of the initial owner.
+     * @param tokenImplementationAddress The address of the token implementation.
+     * @param accessManagerAddress The address of BoulderTech's access manager.
+     */
     function initialize(
         address initialOwner,
         address tokenImplementationAddress,
@@ -182,7 +189,7 @@ contract BTtokensEngine_v1 is
         __Pausable_init();
         __UUPSUpgradeable_init();
         s_tokenImplementationAddress = tokenImplementationAddress;
-        s_accessManagerAddress = accessManagerAddress;
+        s_boulderAccessManagerAddress = accessManagerAddress;
         s_initialized = true;
         s_enginePaused = false; // Set role to pause the engine?
     }
@@ -222,15 +229,7 @@ contract BTtokensEngine_v1 is
         s_deployedTokens[salt] = address(newProxyToken);
         s_deployedTokensKeys.push(salt);
 
-        (
-            address tokenEngine,
-            address tokenManager,
-            address owner,
-            address tokenHolder,
-            string memory tokenName,
-            string memory tokenSymbol,
-            uint8 tokenDecimals
-        ) = abi.decode(data, (address, address, address, address, string, string, uint8));
+        address tokenManager = BTtokens_v1(address(newProxyToken)).s_manager();
 
         s_accessManagerForDeployedTokens[salt] = tokenManager;
 
@@ -240,15 +239,14 @@ contract BTtokensEngine_v1 is
          * @param tokenManager The address of the token manager.
          * @param tokenProxyAddress The address of the token proxy.
          */
-        if (tokenManager != s_accessManagerAddress) {
-            s_accessManagerAddress = tokenManager;
-            emit AccessManagerChanged(address(this), s_accessManagerAddress, tokenManager, tokenProxyAddress);
+        if (tokenManager != s_boulderAccessManagerAddress) {
+            emit AccessManagerSet(address(this), tokenManager, address(newProxyToken));
         }
 
-        _setMinterRole(address(newProxyToken), tokenAgent);
-        _setMinterRole(address(newProxyToken), tokenOwner);
-        _setBurnerRole(address(newProxyToken), tokenAgent);
-        _setBurnerRole(address(newProxyToken), tokenOwner);
+        _setMinterRole(address(newProxyToken), tokenAgent, tokenManager);
+        _setMinterRole(address(newProxyToken), tokenOwner, tokenManager);
+        _setBurnerRole(address(newProxyToken), tokenAgent, tokenManager);
+        _setBurnerRole(address(newProxyToken), tokenOwner, tokenManager);
 
         emit TokenCreated(address(this), address(newProxyToken), tokenName, tokenSymbol);
         return address(newProxyToken);
@@ -287,10 +285,12 @@ contract BTtokensEngine_v1 is
             revert BTtokensEngine__TokenNotDeployed();
         }
         address tokenAddress = s_deployedTokens[key];
+        address tokenManager = s_accessManagerForDeployedTokens[key];
         _removeToken(key);
 
         bytes32 newKey = keccak256(abi.encodePacked(newTokenName, newTokenSymbol));
         s_deployedTokens[newKey] = tokenAddress;
+        s_accessManagerForDeployedTokens[newKey] = tokenManager;
         s_deployedTokensKeys.push(newKey);
 
         BTtokens_v1 c_token = BTtokens_v1(s_deployedTokens[newKey]);
@@ -300,6 +300,33 @@ contract BTtokensEngine_v1 is
         emit TokenNameAndSymbolChanged(
             address(this), tokenAddress, tokenName, tokenSymbol, newTokenName, newTokenSymbol
         );
+    }
+
+    /**
+     * @notice Changes the access manager for a deployed token.
+     * @dev Only the engine owner can call this. Updates the token's access manager via setAccessManager
+     *      and keeps the engine's s_accessManagerForDeployedTokens in sync. The new manager starts with
+     *      no role assignments; use assignMinterRole/assignBurnerRole after this to configure agents.
+     * @param tokenProxyAddress The address of the token proxy.
+     * @param newAccessManager The address of the new access manager.
+     */
+    function changeTokenAccessManager(address tokenProxyAddress, address newAccessManager)
+        external
+        onlyOwner
+        nonZeroAddress(tokenProxyAddress)
+        nonZeroAddress(newAccessManager)
+    {
+        BTtokens_v1 c_token = BTtokens_v1(tokenProxyAddress);
+        bytes32 key = keccak256(abi.encodePacked(c_token.name(), c_token.symbol()));
+        if (s_deployedTokens[key] != tokenProxyAddress) {
+            revert BTtokensEngine__TokenNotDeployed();
+        }
+
+        address oldAccessManager = c_token.s_manager();
+        c_token.setAccessManager(newAccessManager);
+        s_accessManagerForDeployedTokens[key] = newAccessManager;
+
+        emit AccessManagerChanged(address(this), tokenProxyAddress, oldAccessManager, newAccessManager);
     }
 
     /////////   Admin functions   /////////
@@ -353,7 +380,8 @@ contract BTtokensEngine_v1 is
      * @param agent The address of the agent.
      */
     function assignMinterRole(address tokenProxyAddress, address agent) external onlyOwner {
-        _setMinterRole(tokenProxyAddress, agent);
+        address managerAddress = _getManagerAddressForDeployedToken(tokenProxyAddress);
+        _setMinterRole(tokenProxyAddress, agent, managerAddress);
     }
 
     /**
@@ -362,7 +390,8 @@ contract BTtokensEngine_v1 is
      * @param agent The address of the agent.
      */
     function assignBurnerRole(address tokenProxyAddress, address agent) external onlyOwner {
-        _setBurnerRole(tokenProxyAddress, agent);
+        address managerAddress = _getManagerAddressForDeployedToken(tokenProxyAddress);
+        _setBurnerRole(tokenProxyAddress, agent, managerAddress);
     }
 
     ///////// Assign role functions ///////
@@ -408,12 +437,13 @@ contract BTtokensEngine_v1 is
      * @notice Returns BTtokensEngine version
      *
      */
-    function getVersion() external pure virtual returns (uint16) {
-        return 1;
+    function getVersion() external pure virtual returns (string memory) {
+        return "1.1";
     }
 
     /**
-     * @notice Returns the access manager for a deployed token.
+     * @notice Returns the access manager for a deployed token. Bear in mind that the access manager for a deployed
+     * BoulderTech product token can be obtained from the token contract.
      * @param key Bytes32 key to get the token proxy address
      */
     function getAccessManagerForDeployedToken(bytes32 key) external view nonTokenDeployed(key) returns (address) {
@@ -467,9 +497,9 @@ contract BTtokensEngine_v1 is
     /////////   Pause functions   /////////
     ///////// Set roles functions /////////
 
-    function _setMinterRole(address tokenProxyAddress, address agent) internal {
+    function _setMinterRole(address tokenProxyAddress, address agent, address managerAddress) internal {
         // Grant the agent role with no execution delay
-        BTtokensManager c_manager = BTtokensManager(s_accessManagerAddress);
+        BTtokensManager c_manager = BTtokensManager(managerAddress);
         c_manager.grantRole(AGENT, agent, 0);
 
         _cleanAndPushSelector4Bytes(MINT_4_BYTES);
@@ -478,9 +508,9 @@ contract BTtokensEngine_v1 is
         emit MinterRoleSet(tokenProxyAddress, agent);
     }
 
-    function _setBurnerRole(address tokenProxyAddress, address agent) internal {
+    function _setBurnerRole(address tokenProxyAddress, address agent, address managerAddress) internal {
         // Grant the agent role with no execution delay
-        BTtokensManager c_manager = BTtokensManager(s_accessManagerAddress);
+        BTtokensManager c_manager = BTtokensManager(managerAddress);
         c_manager.grantRole(AGENT, agent, 0);
 
         _cleanAndPushSelector4Bytes(BURN_4_BYTES);
@@ -499,9 +529,15 @@ contract BTtokensEngine_v1 is
     ///////// Set roles functions /////////
     /////////   Admin functions   /////////
 
+    function _getManagerAddressForDeployedToken(address tokenProxyAddress) internal view returns (address) {
+        BTtokens_v1 c_token = BTtokens_v1(tokenProxyAddress);
+        return c_token.s_manager();
+    }
+
     function _removeToken(bytes32 salt) internal {
         /// @dev remove salt from mapping
         delete s_deployedTokens[salt];
+        delete s_accessManagerForDeployedTokens[salt];
 
         /// @dev swap-and-pop
         uint256 len = s_deployedTokensKeys.length;
