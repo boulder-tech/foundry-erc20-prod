@@ -2,9 +2,9 @@
 pragma solidity ^0.8.24;
 
 import { Script, console, console2 } from "forge-std/Script.sol";
-import { BTtokensEngine_v1 } from "../src/BTtokensEngine_v1.sol";
-import { BTtokens_v1 } from "../src/BTtokens_v1.sol";
-import { BTtokensManager } from "../src/BTtokensManager.sol";
+import { BTtokensEngine_v1 } from "../src/BTContracts/v1.0/BTtokensEngine_v1.sol";
+import { BTtokens_v1 } from "../src/BTContracts/v1.0/BTtokens_v1.sol";
+import { BTtokensManager } from "../src/BTContracts/v1.0/BTtokensManager.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract DeployEngine is Script {

@@ -401,7 +401,7 @@ contract BTtokensEngine_v1 is
         _setBurnerRole(tokenProxyAddress, agent, managerAddress);
     }
 
-    ///////// Assign role functions ///////
+    ///////// Assign role functions /////////
     /////////   Pause functions   /////////
 
     /**

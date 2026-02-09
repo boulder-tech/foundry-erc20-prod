@@ -271,8 +271,8 @@ contract BTtokens_v1 is
         return s_initialized;
     }
 
-    function getVersion() external view virtual returns (string memory) {
-        return "1.1";
+    function getVersion() external pure virtual returns (uint16) {
+        return 1;
     }
 
     ////////   Getters functions   /////////
@@ -295,24 +295,8 @@ contract BTtokens_v1 is
         s_token_holder = tokenHolder;
     }
 
-    /**
-     * @notice Updates the access manager (authority) for this token.
-     * @dev Only the engine can call this function. Updates both the token's stored reference (s_manager)
-     *      and the underlying AccessManaged authority used by the {restricted} modifier for mint/burn
-     *      permission checks. Without calling _setAuthority, the modifier would still consult the old
-     *      manager and the change would have no effect on access control.
-     *      Note: The new manager starts with no role assignments. Minter and burner roles must be
-     *      configured on the new manager via the engine's assignMinterRole/assignBurnerRole after
-     *      this change.
-     * @param accessManager The address of the new access manager contract (e.g. BTtokensManager).
-     */
-    function setAccessManager(address accessManager) public onlyEngine nonZeroAddress(accessManager) {
-        s_manager = accessManager;
-        _setAuthority(accessManager);
-    }
-
     ////////   Setters functions   /////////
-    ////////  Transfers functions  /////////
+    ////////  Transfers functions   /////////
 
     /**
      * @notice Sets a token allowance for a spender to spend on behalf of the caller.
