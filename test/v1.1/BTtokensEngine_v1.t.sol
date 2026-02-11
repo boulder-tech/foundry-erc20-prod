@@ -521,7 +521,106 @@ contract DeployAndUpgradeTest is Test {
     }
 
     /////////////////////
+    /// Tokens  Tests ///
+    /////////////////////
+
+    function testChangeTokenNameAndSymbol() public deployToken {
+        bytes32 key = keccak256(abi.encodePacked(TOKEN_NAME, TOKEN_SYMBOL));
+        address tokenAddress = EngineV1_1(engineProxy).getDeployedTokenProxyAddress(key);
+
+        string memory newName = "NewTokenName";
+        string memory newSymbol = "NTK";
+        vm.prank(address(this));
+        EngineV1_1(engineProxy).changeTokenNameAndSymbol(TOKEN_NAME, TOKEN_SYMBOL, newName, newSymbol);
+
+        BTtokens_v1 token = BTtokens_v1(tokenAddress);
+        assertEq(token.name(), newName);
+        assertEq(token.symbol(), newSymbol);
+
+        bytes32 newKey = keccak256(abi.encodePacked(newName, newSymbol));
+        assertEq(EngineV1_1(engineProxy).getDeployedTokenProxyAddress(newKey), tokenAddress);
+        assertEq(EngineV1_1(engineProxy).getAccessManagerForDeployedToken(newKey), tokenManagerAddress);
+    }
+
+    function testChangeTokenNameAndSymbolFailsIfNewNameAndSymbolInUse() public deployToken {
+        string memory name2 = "OtherToken";
+        string memory symbol2 = "OTK";
+        bytes memory data = _tokenData(name2, symbol2, tokenManagerAddress);
+        EngineV1_1(engineProxy).createToken(name2, symbol2, data, agent, initialAdmin);
+
+        vm.expectRevert(EngineV1_1.BTtokensEngine__TokenNameAndSymbolAlreadyInUsed.selector);
+        EngineV1_1(engineProxy).changeTokenNameAndSymbol(TOKEN_NAME, TOKEN_SYMBOL, name2, symbol2);
+    }
+
+    function testChangeTokenNameAndSymbolFailsIfTokenNotDeployed() public {
+        vm.expectRevert(EngineV1_1.BTtokensEngine__TokenNotDeployed.selector);
+        EngineV1_1(engineProxy).changeTokenNameAndSymbol("NoSuchToken", "NST", "NewName", "NS");
+    }
+
+    function testChangeTokenNameAndSymbolFailsIfUnauthorized() public deployToken {
+        address unauthorized = makeAddr("unauthorized");
+        vm.prank(unauthorized);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, unauthorized));
+        EngineV1_1(engineProxy).changeTokenNameAndSymbol(TOKEN_NAME, TOKEN_SYMBOL, "NewName", "NS");
+        vm.stopPrank();
+    }
+
+    function testAssignMinterRole() public deployToken {
+        bytes32 key = keccak256(abi.encodePacked(TOKEN_NAME, TOKEN_SYMBOL));
+        address tokenAddress = EngineV1_1(engineProxy).getDeployedTokenProxyAddress(key);
+        address newMinter = makeAddr("newMinter");
+
+        vm.prank(address(this));
+        EngineV1_1(engineProxy).assignMinterRole(tokenAddress, newMinter);
+
+        vm.prank(newMinter);
+        BTtokens_v1(tokenAddress).mint(newMinter, 500);
+        assertEq(BTtokens_v1(tokenAddress).balanceOf(newMinter), 500);
+    }
+
+    function testAssignMinterRoleFailsIfUnauthorized() public deployToken {
+        bytes32 key = keccak256(abi.encodePacked(TOKEN_NAME, TOKEN_SYMBOL));
+        address tokenAddress = EngineV1_1(engineProxy).getDeployedTokenProxyAddress(key);
+        address unauthorized = makeAddr("unauthorized");
+
+        vm.prank(unauthorized);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, unauthorized));
+        EngineV1_1(engineProxy).assignMinterRole(tokenAddress, makeAddr("newMinter"));
+        vm.stopPrank();
+    }
+
+    function testAssignBurnerRole() public deployToken {
+        bytes32 key = keccak256(abi.encodePacked(TOKEN_NAME, TOKEN_SYMBOL));
+        address tokenAddress = EngineV1_1(engineProxy).getDeployedTokenProxyAddress(key);
+        // Token only allows burning from s_token_holder or blacklisted accounts; tokenHolder is initialAdmin from _tokenData
+        address tokenHolder = initialAdmin;
+
+        vm.prank(agent);
+        BTtokens_v1(tokenAddress).mint(tokenHolder, 1000);
+        assertEq(BTtokens_v1(tokenAddress).balanceOf(tokenHolder), 1000);
+
+        vm.prank(address(this));
+        EngineV1_1(engineProxy).assignBurnerRole(tokenAddress, agent);
+
+        vm.prank(agent);
+        BTtokens_v1(tokenAddress).burn(tokenHolder, 400);
+        assertEq(BTtokens_v1(tokenAddress).balanceOf(tokenHolder), 600);
+    }
+
+    function testAssignBurnerRoleFailsIfUnauthorized() public deployToken {
+        bytes32 key = keccak256(abi.encodePacked(TOKEN_NAME, TOKEN_SYMBOL));
+        address tokenAddress = EngineV1_1(engineProxy).getDeployedTokenProxyAddress(key);
+        address unauthorized = makeAddr("unauthorized");
+
+        vm.prank(unauthorized);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, unauthorized));
+        EngineV1_1(engineProxy).assignBurnerRole(tokenAddress, makeAddr("burner"));
+        vm.stopPrank();
+    }
+
+    /////////////////////
     /// Getters Tests ///
+    /////////////////////
     /////////////////////
 
     function testGetDeployedTokenProxyAddress() public deployToken {
