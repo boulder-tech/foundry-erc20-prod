@@ -12,7 +12,7 @@ import { BTtokensManager } from "../../src/BTContracts/v1.0/BTtokensManager.sol"
 /**
  * @title Tests for BTtokens_v1 (token) in v1.1.
  * @notice Engine tests live in BTtokensEngine_v1.t.sol; upgrade flow in UpgradeV1_0_to_V1_1.t.sol.
- *         Here: comportamiento del token v1.1 (mint, burn, transfer, permit, setAccessManager, upgrade, etc.).
+ *         Here: v1.1 token behavior (mint, burn, transfer, permit, setAccessManager, upgrade, etc.).
  */
 contract BTtokensV1_1Test is Test {
     DeployEngine public engineDeployer;
