@@ -2,25 +2,25 @@
 pragma solidity ^0.8.18;
 
 import { Test, console, console2 } from "forge-std/Test.sol";
-import { DeployEngine } from "../script/DeployEngine.s.sol";
+import { DeployEngine } from "../../script/DeployEngine.s.sol";
 import {
     BTtokensEngine_v1,
     OwnableUpgradeable,
     Initializable,
     BTtokenProxy,
     PausableUpgradeable
-} from "../src/BTContracts/v1.0/BTtokensEngine_v1.sol";
-import { BTtokens_v1, AccessManagedUpgradeable } from "../src/BTContracts/v1.0/BTtokens_v1.sol";
+} from "../../src/BTContracts/v1.1/BTtokensEngine_v1.sol";
+import { BTtokens_v1, AccessManagedUpgradeable } from "../../src/BTContracts/v1.1/BTtokens_v1.sol";
 import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
-import { BTtokensManager } from "../src/BTContracts/v1.0/BTtokensManager.sol";
+import { BTtokensManager } from "../../src/BTContracts/v1.1/BTtokensManager.sol";
 
 contract BTtokensEngine_v2 is BTtokensEngine_v1 {
     /**
      * @dev Function that returns the version of the contract.
-     * @return uint16 The version of the contract.
+     * @return string memory The version of the contract.
      */
-    function getVersion() external pure virtual override returns (uint16) {
-        return 2;
+    function getVersion() external pure virtual override returns (string memory) {
+        return "1.1";
     }
 
     /**
@@ -91,7 +91,7 @@ contract DeployAndUpgradeTest is Test {
 
         bool isInitialized = engine.s_initialized();
         address storedImplementation = engine.s_tokenImplementationAddress();
-        address storedAccessManager = engine.s_accessManagerAddress();
+        address storedAccessManager = engine.s_boulderAccessManagerAddress();
         bool enginePaused = engine.s_enginePaused();
         address engineOwner = engine.owner();
 
@@ -114,7 +114,7 @@ contract DeployAndUpgradeTest is Test {
         BTtokensEngine_v1 engine = BTtokensEngine_v1(engineProxy);
         assertEq(engine.s_initialized(), true);
         assertEq(engine.s_tokenImplementationAddress(), tokenImplementationAddress);
-        assertEq(engine.s_accessManagerAddress(), tokenManagerAddress);
+        assertEq(engine.s_boulderAccessManagerAddress(), tokenManagerAddress);
     }
 
     ///////////////////////////
@@ -637,8 +637,8 @@ contract DeployAndUpgradeTest is Test {
     }
 
     function testGetVersion() public {
-        uint16 version = BTtokensEngine_v1(engineProxy).getVersion();
-        assertTrue(version == 1);
+        string memory version = BTtokensEngine_v1(engineProxy).getVersion();
+        assertEq(version, "1.1");
     }
 
     /////////////////////
@@ -656,7 +656,7 @@ contract DeployAndUpgradeTest is Test {
 
         vm.stopPrank();
 
-        assertEq(BTtokensEngine_v2(engineProxy).getVersion(), 2);
+        assertEq(BTtokensEngine_v2(engineProxy).getVersion(), "1.1");
     }
 
     function testUpgradeToNewImplementationFailsIfUnauthorized() public {

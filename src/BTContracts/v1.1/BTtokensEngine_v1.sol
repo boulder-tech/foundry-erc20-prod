@@ -50,8 +50,6 @@ contract BTtokensEngine_v1 is
     mapping(address => bool) public s_blacklist;
     /// @dev Array to keep track of deployed tokens
     mapping(bytes32 => address) public s_deployedTokens;
-    /// @dev Array to track access manager for deployed tokens
-    mapping(bytes32 => address) public s_accessManagerForDeployedTokens;
 
     address public s_tokenImplementationAddress;
     address public s_boulderAccessManagerAddress;
@@ -317,7 +315,10 @@ contract BTtokensEngine_v1 is
      * @param tokenProxyAddress The address of the token proxy.
      * @param newAccessManager The address of the new access manager.
      */
-    function changeTokenAccessManager(address tokenProxyAddress, address newAccessManager)
+    function changeTokenAccessManager(
+        address tokenProxyAddress,
+        address newAccessManager
+    )
         external
         onlyOwner
         nonZeroAddress(tokenProxyAddress)
@@ -567,8 +568,22 @@ contract BTtokensEngine_v1 is
      */
     function _authorizeUpgrade(address _newImplementation) internal virtual override onlyOwner whenEnginePaused { }
 
+    //////////////////////////
+    // New State Variables ///
+    //////////////////////////
+    //
+    // @dev In Solidity, storage is slot-based: each state variable is assigned a slot by declaration order.
+    //      If we change the order or insert variables in the middle from one version to the next, the new
+    //      implementation would read/write the wrong slots — we would be looking at different data and
+    //      state would be corrupted after an upgrade. New variables must be appended (from __gap) so that
+    //      existing slots stay the same across versions.
+
+    /// @dev Access manager per deployed token (v1.1). Added from __gap to preserve layout vs v1.0.
+    mapping(bytes32 => address) public s_accessManagerForDeployedTokens;
+
     /**
-     * @dev Reserved storage space to allow for layout changes in the future. uint256[50] __gap;
+     * @dev Reserved storage space to allow for layout changes in the future. Reduced by 1 for
+     * s_accessManagerForDeployedTokens.
      */
-    uint256[50] __gap;
+    uint256[49] __gap;
 }

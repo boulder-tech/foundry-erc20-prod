@@ -129,5 +129,9 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
+# Foundry
+cache/
+out/
+
 # lib
 lib/
