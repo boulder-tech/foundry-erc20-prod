@@ -49,6 +49,7 @@ Este documento describe el test `UpgradeV1_0_to_V1_1.t.sol`, que valida el **upg
 | `test_UpgradeV1_0_to_V1_1_OnlyOwner` | Que solo el owner del engine pueda llamar `upgradeToAndCall` en el engine (`OwnableUnauthorizedAccount`). |
 | `test_UpgradeV1_0_to_V1_1_ChangeTokenAccessManager` | Tras upgrade completo: llamar `engine.changeTokenAccessManager(token, newManager)`, y comprobar que el token tiene `s_manager() == newManager` y que `getAccessManagerForDeployedToken(salt)` devuelve el nuevo manager. |
 | `test_UpgradeV1_0_to_V1_1_NewTokensUseV1_1Implementation` | Tras upgrade del engine a v1.1: llamar `setNewTokenImplementationAddress(tokenV1_1Implementation)` (con engine pausado), despausar y crear un **nuevo** token (nombre/símbolo distintos). Comprueba que el token recién creado es v1.1 (`getVersion() == "1.1"`) y que el engine lo tiene en `getAccessManagerForDeployedToken(salt)`. |
+| `test_UpgradeV1_0_to_V1_1_NewTokenWithDifferentAccessManager` | Igual que el anterior (engine v1.1, token impl v1.1) pero el **nuevo** token usa **otro** access manager: en `data` se pasa `abi.encode(engine, otherManager, ...)`. Se despliega un segundo `BTtokensManager`, se le da `ADMIN_ROLE` al engine en ese manager, y se crea el token. Comprueba que el token tiene `s_manager() == otherManager` y que `getAccessManagerForDeployedToken(salt)` devuelve ese manager (caso “token por grupo”). |
 
 ---
 
