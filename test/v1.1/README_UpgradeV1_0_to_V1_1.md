@@ -2,6 +2,11 @@
 
 Este documento describe el test `UpgradeV1_0_to_V1_1.t.sol`, que valida el **upgrade en producción** desde la stack v1.0 (engine + token) a la v1.1, y la funcionalidad nueva de **cambio de access manager por token**.
 
+**Dónde van los tests por tipo (misma idea que en v1.0):**
+- **Engine** → `test/v1.1/BTtokensEngine_v1.t.sol` (inicialización, createToken, pause, setNewTokenImplementationAddress, changeTokenAccessManager, blacklist, etc.).
+- **Token** → `test/v1.1/BTtokens_v1.t.sol` (mint, burn, transfer, permit, setAccessManager, upgrade del token, etc.).
+- **Upgrade de versiones** → solo en `UpgradeV1_0_to_V1_1.t.sol` (flujo deploy v1.0 → upgrade engine → upgrade token y aserciones de estado / v1.1).
+
 ---
 
 ## Objetivo
