@@ -37,6 +37,8 @@ contract DeployAndUpgradeTest is Test {
 
     /// @dev v1.1 implementation used in setUp so all tests run against engine v1.1
     EngineV1_1 newEngineImplementation = new EngineV1_1();
+    /// @dev v1.1 token implementation so createToken deploys v1.1 tokens (required for changeTokenAccessManager)
+    BTtokens_v1 public tokenV1_1Implementation;
     /// @dev v2 test double used only in upgrade tests to verify upgrade path (getVersion "2.0")
     BTtokensEngine_v2 v2EngineImplementation = new BTtokensEngine_v2();
 
@@ -103,6 +105,14 @@ contract DeployAndUpgradeTest is Test {
         EngineV1_1(engineProxy).upgradeToAndCall(address(newEngineImplementation), "");
         EngineV1_1(engineProxy).unPauseEngine();
         vm.stopPrank();
+
+        // Set token implementation to v1.1 so createToken deploys v1.1 tokens (needed for changeTokenAccessManager)
+        tokenV1_1Implementation = new BTtokens_v1();
+        vm.startPrank(address(this));
+        EngineV1_1(engineProxy).pauseEngine();
+        EngineV1_1(engineProxy).setNewTokenImplementationAddress(address(tokenV1_1Implementation));
+        EngineV1_1(engineProxy).unPauseEngine();
+        vm.stopPrank();
     }
 
     ////////////////////////////
@@ -144,7 +154,7 @@ contract DeployAndUpgradeTest is Test {
         assertEq(isInitialized, true);
         assertEq(isPaused, false);
         assertEq(engineOwner, address(this));
-        assertEq(storedImplementation, tokenImplementationAddress);
+        assertEq(storedImplementation, address(tokenV1_1Implementation));
         assertEq(storedAccessManager, tokenManagerAddress);
     }
 
@@ -152,7 +162,7 @@ contract DeployAndUpgradeTest is Test {
         // Engine is already initialized and upgraded to v1.1 in setUp; assert state
         EngineV1_1 engine = EngineV1_1(engineProxy);
         assertEq(engine.s_initialized(), true);
-        assertEq(engine.s_tokenImplementationAddress(), tokenImplementationAddress);
+        assertEq(engine.s_tokenImplementationAddress(), address(tokenV1_1Implementation));
         assertEq(engine.s_boulderAccessManagerAddress(), tokenManagerAddress);
     }
 
@@ -539,6 +549,75 @@ contract DeployAndUpgradeTest is Test {
     }
 
     /////////////////////
+    /// Manager Tests ///
+    /////////////////////
+
+    function testGetAccessManagerForDeployedTokenAfterCreate() public deployToken {
+        bytes32 key = keccak256(abi.encodePacked(TOKEN_NAME, TOKEN_SYMBOL));
+        assertEq(EngineV1_1(engineProxy).getAccessManagerForDeployedToken(key), tokenManagerAddress);
+    }
+
+    function testGetAccessManagerForDeployedTokenFailsIfNotDeployed() public {
+        bytes32 key = keccak256(abi.encodePacked(TOKEN_NAME, TOKEN_SYMBOL));
+        vm.expectRevert(EngineV1_1.BTtokensEngine__TokenNotDeployed.selector);
+        EngineV1_1(engineProxy).getAccessManagerForDeployedToken(key);
+    }
+
+    function testChangeTokenAccessManager() public deployToken {
+        bytes32 key = keccak256(abi.encodePacked(TOKEN_NAME, TOKEN_SYMBOL));
+        address tokenAddress = EngineV1_1(engineProxy).getDeployedTokenProxyAddress(key);
+
+        BTtokensManager secondManager = new BTtokensManager(initialAdmin);
+        vm.prank(initialAdmin);
+        secondManager.grantRole(ADMIN_ROLE, address(engineProxy), 0);
+
+        vm.prank(address(this));
+        EngineV1_1(engineProxy).changeTokenAccessManager(tokenAddress, address(secondManager));
+
+        assertEq(BTtokens_v1(tokenAddress).s_manager(), address(secondManager));
+        assertEq(EngineV1_1(engineProxy).getAccessManagerForDeployedToken(key), address(secondManager));
+    }
+
+    function testChangeTokenAccessManagerFailsIfUnauthorized() public deployToken {
+        bytes32 key = keccak256(abi.encodePacked(TOKEN_NAME, TOKEN_SYMBOL));
+        address tokenAddress = EngineV1_1(engineProxy).getDeployedTokenProxyAddress(key);
+        BTtokensManager newManager = new BTtokensManager(initialAdmin);
+
+        address unauthorized = makeAddr("unauthorized");
+        vm.prank(unauthorized);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, unauthorized));
+        EngineV1_1(engineProxy).changeTokenAccessManager(tokenAddress, address(newManager));
+        vm.stopPrank();
+    }
+
+    function testChangeTokenAccessManagerFailsIfZeroAddress() public deployToken {
+        bytes32 key = keccak256(abi.encodePacked(TOKEN_NAME, TOKEN_SYMBOL));
+        address tokenAddress = EngineV1_1(engineProxy).getDeployedTokenProxyAddress(key);
+
+        vm.expectRevert(EngineV1_1.BTtokensEngine__AddressCanNotBeZero.selector);
+        EngineV1_1(engineProxy).changeTokenAccessManager(tokenAddress, address(0));
+
+        vm.expectRevert(EngineV1_1.BTtokensEngine__AddressCanNotBeZero.selector);
+        EngineV1_1(engineProxy).changeTokenAccessManager(address(0), tokenManagerAddress);
+    }
+
+    function testCreateTokenWithDifferentManagerRecordsManager() public {
+        BTtokensManager otherManager = new BTtokensManager(initialAdmin);
+        vm.prank(initialAdmin);
+        otherManager.grantRole(ADMIN_ROLE, address(engineProxy), 0);
+
+        string memory name2 = "GroupToken";
+        string memory symbol2 = "GRP";
+        bytes memory data = _tokenData(name2, symbol2, address(otherManager));
+        address token2 = EngineV1_1(engineProxy).createToken(name2, symbol2, data, agent, initialAdmin);
+        assertTrue(token2 != address(0));
+
+        assertEq(BTtokens_v1(token2).s_manager(), address(otherManager));
+        bytes32 salt2 = keccak256(abi.encodePacked(name2, symbol2));
+        assertEq(EngineV1_1(engineProxy).getAccessManagerForDeployedToken(salt2), address(otherManager));
+    }
+
+    /////////////////////
     /// Upgrade Tests ///
     /////////////////////
 
@@ -579,17 +658,6 @@ contract DeployAndUpgradeTest is Test {
         BTtokensManager(manager).grantRole(ADMIN_ROLE, proxy, 0);
         vm.stopPrank();
         EngineV1_1(proxy).initialize(address(this), tokenImpl, manager);
-    }
-
-    modifier engineUpgraded() {
-        vm.startPrank(address(this));
-
-        EngineV1_1(engineProxy).pauseEngine();
-        EngineV1_1(engineProxy).upgradeToAndCall(address(newEngineImplementation), "");
-        EngineV1_1(engineProxy).unPauseEngine();
-        vm.stopPrank();
-
-        _;
     }
 
     function testNewEngineCanCreateTokens() public {
