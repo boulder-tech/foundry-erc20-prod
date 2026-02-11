@@ -48,6 +48,7 @@ Este documento describe el test `UpgradeV1_0_to_V1_1.t.sol`, que valida el **upg
 | `test_UpgradeV1_0_to_V1_1_RequiresPaused` | Que no se pueda hacer upgrade del engine sin antes pausar (`BTtokensEngine__EngineNotPaused`). |
 | `test_UpgradeV1_0_to_V1_1_OnlyOwner` | Que solo el owner del engine pueda llamar `upgradeToAndCall` en el engine (`OwnableUnauthorizedAccount`). |
 | `test_UpgradeV1_0_to_V1_1_ChangeTokenAccessManager` | Tras upgrade completo: llamar `engine.changeTokenAccessManager(token, newManager)`, y comprobar que el token tiene `s_manager() == newManager` y que `getAccessManagerForDeployedToken(salt)` devuelve el nuevo manager. |
+| `test_UpgradeV1_0_to_V1_1_NewTokensUseV1_1Implementation` | Tras upgrade del engine a v1.1: llamar `setNewTokenImplementationAddress(tokenV1_1Implementation)` (con engine pausado), despausar y crear un **nuevo** token (nombre/símbolo distintos). Comprueba que el token recién creado es v1.1 (`getVersion() == "1.1"`) y que el engine lo tiene en `getAccessManagerForDeployedToken(salt)`. |
 
 ---
 
@@ -86,4 +87,5 @@ forge test --match-test "test_UpgradeV1_0_to_V1_1_ChangeTokenAccessManager" -vvv
 - **Qué prueba**: upgrade realista v1.0 → v1.1 (engine y token) y la función v1.1 `changeTokenAccessManager`.
 - **Por qué upgrade del token**: el token v1.1 expone `setAccessManager(onlyEngine)`; el engine v1.1 lo usa en `changeTokenAccessManager`. Sin upgrade del token, esa función no podría cambiar el manager del token.
 - **Quién hace cada upgrade**: engine → owner del engine (test); token → owner del token (`initialAdmin`), con engine pausado.
+- **Nuevos tokens en v1.1**: tras el upgrade del engine, se puede llamar `setNewTokenImplementationAddress(impl v1.1)` (con engine pausado); los tokens creados después usan ya la impl v1.1 y el engine registra su manager en `s_accessManagerForDeployedTokens` (test `NewTokensUseV1_1Implementation`).
 - **Dónde mirar el código**: `test/v1.1/UpgradeV1_0_to_V1_1.t.sol` y este README en `test/v1.1/README_UpgradeV1_0_to_V1_1.md`.
