@@ -49,9 +49,12 @@ contract UpgradeEngineToV1_1 is Script {
         vm.startBroadcast(owner);
 
         // 1. Deploy new v1.1 implementation
+        // NOTE: This implementation will be automatically verified on BaseScan
+        // when using --verify flag. Check BaseScan after deployment to confirm.
         console2.log("\n1. Deploying engine v1.1 implementation...");
         EngineV1_1 engineV1_1Implementation = new EngineV1_1();
         console2.log("Engine v1.1 Implementation:", address(engineV1_1Implementation));
+        console2.log("NOTE: Verify this contract on BaseScan after deployment");
 
         // 2. Verify current state
         EngineV1_0 engine = EngineV1_0(ENGINE_PROXY);
@@ -84,7 +87,11 @@ contract UpgradeEngineToV1_1 is Script {
         vm.stopBroadcast();
 
         console2.log("\n=== Upgrade Complete ===");
-        console2.log("Next steps:");
+        console2.log("\nVerification:");
+        console2.log("The new implementation contract should be verified on BaseScan.");
+        console2.log("If verification failed, manually verify at:");
+        console2.log("  https://sepolia.basescan.org/address/", address(engineV1_1Implementation));
+        console2.log("\nNext steps:");
         console2.log("1. Deploy token v1.1 implementation");
         console2.log("2. Call setNewTokenImplementationAddress(tokenV1_1Implementation)");
         console2.log("3. Upgrade existing tokens using UpgradeTokenToV1_1.s.sol");

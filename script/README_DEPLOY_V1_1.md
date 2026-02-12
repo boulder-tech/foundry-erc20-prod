@@ -130,6 +130,50 @@ Para cada token existente que quieras upgradear:
 - Puedes usar `changeTokenAccessManager()` después de upgradear el token a v1.1
 - El engine registrará el nuevo manager en el mapping
 
+## Verificación de Contratos en BaseScan
+
+### Verificación Automática
+
+Cuando ejecutas los scripts con el flag `--verify`, Foundry intenta verificar automáticamente todos los contratos deployados en BaseScan:
+
+- **Nueva implementación del engine v1.1**: Se deploya en `UpgradeEngineToV1_1.s.sol` (línea 53)
+- **Nueva implementación del token v1.1**: Se deploya en `SetTokenImplementationV1_1.s.sol`
+- **Cualquier otro contrato deployado durante el broadcast**
+
+La verificación se hace automáticamente usando tu `BASESCAN_API_KEY` configurada en `foundry.toml`.
+
+### Verificación Manual (si falla la automática)
+
+Si la verificación automática falla, puedes verificar manualmente:
+
+#### Engine v1.1 Implementation:
+```bash
+forge verify-contract <ENGINE_V1_1_IMPLEMENTATION_ADDRESS> \
+  src/BTContracts/v1.1/BTtokensEngine_v1.sol:BTtokensEngine_v1 \
+  --chain-id 84532 \
+  --etherscan-api-key $BASESCAN_API_KEY \
+  --compiler-version 0.8.24 \
+  --num-of-optimizations 200 \
+  --constructor-args $(cast abi-encode "constructor()")
+```
+
+#### Token v1.1 Implementation:
+```bash
+forge verify-contract <TOKEN_V1_1_IMPLEMENTATION_ADDRESS> \
+  src/BTContracts/v1.1/BTtokens_v1.sol:BTtokens_v1 \
+  --chain-id 84532 \
+  --etherscan-api-key $BASESCAN_API_KEY \
+  --compiler-version 0.8.24 \
+  --num-of-optimizations 200 \
+  --constructor-args $(cast abi-encode "constructor()")
+```
+
+**Nota importante**: Solo se verifica la nueva implementación, NO el proxy. El proxy ya está verificado y apunta a la nueva implementación después del upgrade.
+
+**URLs de BaseScan**:
+- Base Sepolia Explorer: `https://sepolia.basescan.org/address/<ADDRESS>`
+- Chain ID: `84532`
+
 ## Verificación Post-Upgrade
 
 Después de completar todos los pasos, verifica:
@@ -140,12 +184,15 @@ Después de completar todos los pasos, verifica:
    engine.s_tokenImplementationAddress() == tokenV1_1Implementation
    !engine.isEnginePaused()
    ```
+   - Verifica en BaseScan que la nueva implementación esté verificada
+   - El proxy debe mostrar la nueva implementación en "Implementation"
 
 2. **Tokens nuevos**:
    ```solidity
    token.getVersion() == "1.1"
    engine.getAccessManagerForDeployedToken(salt) == managerAddress
    ```
+   - Verifica en BaseScan que el token use la implementación v1.1
 
 3. **Tokens upgradeados**:
    ```solidity
@@ -153,6 +200,7 @@ Después de completar todos los pasos, verifica:
    token.setAccessManager() disponible
    engine.changeTokenAccessManager() funciona
    ```
+   - Verifica en BaseScan que el token proxy apunte a la implementación v1.1
 
 ## Troubleshooting
 
@@ -168,6 +216,12 @@ Después de completar todos los pasos, verifica:
 
 ### Error: "Token v1.1 implementation not set"
 - Ejecuta `SetTokenImplementationV1_1.s.sol` antes de upgradear tokens
+
+### Error: "Verification failed" o "Contract verification failed"
+- La verificación automática puede fallar por timeout o problemas de red
+- Usa los comandos de verificación manual mencionados arriba
+- Asegúrate de tener la `BASESCAN_API_KEY` correcta en `.env`
+- Verifica que el compilador y optimizaciones coincidan con el deploy
 
 ## Testing Local
 

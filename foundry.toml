@@ -20,9 +20,11 @@ remappings = [
 [etherscan]
 mainnet = { key = "${ETHERSCAN_API_KEY}" }
 sepolia = { key = "${ETHERSCAN_API_KEY}" }
+base_sepolia = { key = "${BASESCAN_API_KEY}" }
 
 [rpc_endpoints]
 sepolia = "${SEPOLIA_RPC_URL}"
+base_sepolia = "${BASE_SEPOLIA_RPC_URL}"
 
 [fuzz]
 runs = 999
