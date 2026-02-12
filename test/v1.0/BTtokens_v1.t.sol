@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.18;
+pragma solidity ^0.8.24;
 
 import { Test, console, console2 } from "forge-std/Test.sol";
-import { DeployEngine } from "../script/DeployEngine.s.sol";
+import { DeployEngine } from "../../script/DeployEngine.s.sol";
 import {
     BTtokensEngine_v1,
     OwnableUpgradeable,
     Initializable,
     BTtokenProxy,
     PausableUpgradeable
-} from "../src/BTtokensEngine_v1.sol";
-import { BTtokens_v1, AccessManagedUpgradeable, ERC20PermitUpgradeable } from "../src/BTtokens_v1.sol";
+} from "../../src/BTContracts/v1.0/BTtokensEngine_v1.sol";
+import { BTtokens_v1, AccessManagedUpgradeable, ERC20PermitUpgradeable } from "../../src/BTContracts/v1.0/BTtokens_v1.sol";
 import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
-import { BTtokensManager } from "../src/BTtokensManager.sol";
+import { BTtokensManager } from "../../src/BTContracts/v1.0/BTtokensManager.sol";
 import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import { ERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
@@ -96,7 +96,7 @@ contract DeployAndUpgradeTest is Test {
 
     /// @dev tried to use modifiers instead of require statements and got this error: CompilerError: Stack too deep. Try
     /// compiling with `--via-ir` (cli) or the equivalent `viaIR: true` (standard JSON) while enabling the optimizer.
-    /// Otherwise, try removing local variables.   --> src/BTtokens_v1.sol:148:24:
+    /// Otherwise, try removing local variables.   --> ../../src/BTContracts/v1.0/BTtokens_v1.sol:148:24:
 
     function testCanNotInitializeWithEmptyName() public {
         string memory tokenName = "";

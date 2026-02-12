@@ -336,7 +336,7 @@ contract BTtokensEngine_v1 is
     }
 
     /////////   Pause functions   /////////
-    ////////   Getters functions  /////////
+    ////////   Getters functions   /////////
 
     /**
      * @notice This function will be helpfull when upgrading token contracts if token implementation address is updated.

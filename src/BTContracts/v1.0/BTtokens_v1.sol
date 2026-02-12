@@ -296,7 +296,7 @@ contract BTtokens_v1 is
     }
 
     ////////   Setters functions   /////////
-    ////////  Transfers functions  /////////
+    ////////  Transfers functions   /////////
 
     /**
      * @notice Sets a token allowance for a spender to spend on behalf of the caller.
