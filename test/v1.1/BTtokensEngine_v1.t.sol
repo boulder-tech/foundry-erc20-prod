@@ -530,6 +530,10 @@ contract DeployAndUpgradeTest is Test {
 
         string memory newName = "NewTokenName";
         string memory newSymbol = "NTK";
+        vm.expectEmit(true, true, true, true, address(engineProxy));
+        emit EngineV1_1.TokenNameAndSymbolChanged(
+            address(engineProxy), tokenAddress, TOKEN_NAME, TOKEN_SYMBOL, newName, newSymbol
+        );
         vm.prank(address(this));
         EngineV1_1(engineProxy).changeTokenNameAndSymbol(TOKEN_NAME, TOKEN_SYMBOL, newName, newSymbol);
 
@@ -670,6 +674,11 @@ contract DeployAndUpgradeTest is Test {
         vm.prank(initialAdmin);
         secondManager.grantRole(ADMIN_ROLE, address(engineProxy), 0);
 
+        address oldManager = tokenManagerAddress;
+        vm.expectEmit(true, true, true, true, address(engineProxy));
+        emit EngineV1_1.AccessManagerChanged(
+            address(engineProxy), tokenAddress, oldManager, address(secondManager)
+        );
         vm.prank(address(this));
         EngineV1_1(engineProxy).changeTokenAccessManager(tokenAddress, address(secondManager));
 
