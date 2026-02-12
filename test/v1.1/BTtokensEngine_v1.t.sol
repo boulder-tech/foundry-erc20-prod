@@ -31,7 +31,7 @@ contract BTtokensEngine_v2 is EngineV1_1 {
     function _authorizeUpgrade(address _newImplementation) internal virtual override onlyOwner whenNotEnginePaused { }
 }
 
-contract DeployAndUpgradeTest is Test {
+contract BTtokensEngineV1_1Test is Test {
     DeployEngine public engineDeployer;
     BTtokenProxy tokenProxy;
 
