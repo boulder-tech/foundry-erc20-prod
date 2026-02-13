@@ -248,11 +248,9 @@ contract BTtokensEngine_v1 is
             emit AccessManagerSet(address(this), tokenManager, address(newProxyToken));
         }
 
-        _setMinterRole(address(newProxyToken), tokenAgent, tokenManager);
-        _setMinterRole(address(newProxyToken), tokenOwner, tokenManager);
-        _setBurnerRole(address(newProxyToken), tokenAgent, tokenManager);
-        _setBurnerRole(address(newProxyToken), tokenOwner, tokenManager);
-
+        _setAgentRole(address(newProxyToken), tokenAgent);
+        _setAgentRole(address(newProxyToken), tokenOwner);
+        
         emit TokenCreated(address(this), address(newProxyToken), tokenName, tokenSymbol);
         return address(newProxyToken);
     }
@@ -402,6 +400,15 @@ contract BTtokensEngine_v1 is
         _setBurnerRole(tokenProxyAddress, agent, managerAddress);
     }
 
+    /**
+     * @notice Assigns the minter and burner roles to an agent.
+     * @param tokenProxyAddress The address of the token proxy.
+     * @param agent The address of the agent.
+     */
+    function assignAgentRole(address tokenProxyAddress, address agent) external onlyOwner {
+        _setAgentRole(tokenProxyAddress, agent);
+    }
+
     ///////// Assign role functions /////////
     /////////   Pause functions   /////////
 
@@ -504,6 +511,12 @@ contract BTtokensEngine_v1 is
 
     /////////   Pause functions   /////////
     ///////// Set roles functions /////////
+
+    function _setAgentRole(address tokenProxyAddress, address agent) internal {
+        address managerAddress = _getManagerAddressForDeployedToken(tokenProxyAddress);
+        _setMinterRole(tokenProxyAddress, agent, managerAddress);
+        _setBurnerRole(tokenProxyAddress, agent, managerAddress);
+    }
 
     function _setMinterRole(address tokenProxyAddress, address agent, address managerAddress) internal {
         // Grant the agent role with no execution delay

@@ -622,6 +622,37 @@ contract BTtokensEngineV1_1Test is Test {
         vm.stopPrank();
     }
 
+    function testAssignAgentRole() public deployToken {
+        bytes32 key = keccak256(abi.encodePacked(TOKEN_NAME, TOKEN_SYMBOL));
+        address tokenAddress = EngineV1_1(engineProxy).getDeployedTokenProxyAddress(key);
+        address newAgent = makeAddr("newAgent");
+        address tokenHolder = initialAdmin;
+
+        vm.prank(address(this));
+        EngineV1_1(engineProxy).assignAgentRole(tokenAddress, newAgent);
+
+        vm.prank(newAgent);
+        BTtokens_v1(tokenAddress).mint(newAgent, 300);
+        assertEq(BTtokens_v1(tokenAddress).balanceOf(newAgent), 300);
+
+        vm.prank(agent);
+        BTtokens_v1(tokenAddress).mint(tokenHolder, 1000);
+        vm.prank(newAgent);
+        BTtokens_v1(tokenAddress).burn(tokenHolder, 400);
+        assertEq(BTtokens_v1(tokenAddress).balanceOf(tokenHolder), 600);
+    }
+
+    function testAssignAgentRoleFailsIfUnauthorized() public deployToken {
+        bytes32 key = keccak256(abi.encodePacked(TOKEN_NAME, TOKEN_SYMBOL));
+        address tokenAddress = EngineV1_1(engineProxy).getDeployedTokenProxyAddress(key);
+        address unauthorized = makeAddr("unauthorized");
+
+        vm.prank(unauthorized);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, unauthorized));
+        EngineV1_1(engineProxy).assignAgentRole(tokenAddress, makeAddr("newAgent"));
+        vm.stopPrank();
+    }
+
     /////////////////////
     /// Getters Tests ///
     /////////////////////
