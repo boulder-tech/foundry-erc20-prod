@@ -132,6 +132,9 @@ contract BTtokensV1_1Test is Test {
         TokenV1_0(tokenAddress).upgradeToAndCall(address(tokenV1_1Impl), "");
         vm.prank(address(this));
         EngineV1_1(engineProxy).unPauseEngine();
+
+        vm.prank(tokenOwner);
+        TokenV1_1(tokenAddress).setTransfersEnabled(true);
     }
 
     ///////////////////////
@@ -253,6 +256,43 @@ contract BTtokensV1_1Test is Test {
         vm.prank(engineProxy);
         vm.expectRevert(TokenV1_1.BTtokens__AddressCanNotBeZero.selector);
         TokenV1_1(tokenAddress).setAccessManager(address(0));
+    }
+
+    function testSetTransfersEnabledOnlyOwner() public {
+        vm.prank(testAddress);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, testAddress));
+        TokenV1_1(tokenAddress).setTransfersEnabled(false);
+    }
+
+    function testTransferRevertsWhenTransfersDisabled() public mintTokensToTestAddress {
+        vm.prank(tokenOwner);
+        TokenV1_1(tokenAddress).setTransfersEnabled(false);
+        vm.prank(testAddress);
+        vm.expectRevert(TokenV1_1.BTtokens__TransfersDisabled.selector);
+        TokenV1_1(tokenAddress).transfer(testAddress2, AMOUNT);
+    }
+
+    function testTransferFromRevertsWhenTransfersDisabled() public mintTokensToTestAddress withApproval {
+        vm.prank(tokenOwner);
+        TokenV1_1(tokenAddress).setTransfersEnabled(false);
+        vm.prank(testAddress2);
+        vm.expectRevert(TokenV1_1.BTtokens__TransfersDisabled.selector);
+        TokenV1_1(tokenAddress).transferFrom(testAddress, testAddress2, AMOUNT);
+    }
+
+    function testOwnerCanDisableAndReenableTransfers() public mintTokensToTestAddress {
+        vm.prank(tokenOwner);
+        TokenV1_1(tokenAddress).setTransfersEnabled(false);
+        assertFalse(TokenV1_1(tokenAddress).s_transfersEnabled());
+        vm.prank(testAddress);
+        vm.expectRevert(TokenV1_1.BTtokens__TransfersDisabled.selector);
+        TokenV1_1(tokenAddress).transfer(testAddress2, AMOUNT);
+        vm.prank(tokenOwner);
+        TokenV1_1(tokenAddress).setTransfersEnabled(true);
+        assertTrue(TokenV1_1(tokenAddress).s_transfersEnabled());
+        vm.prank(testAddress);
+        TokenV1_1(tokenAddress).transfer(testAddress2, AMOUNT);
+        assertEq(TokenV1_1(tokenAddress).balanceOf(testAddress2), AMOUNT);
     }
 
     ////////////////////

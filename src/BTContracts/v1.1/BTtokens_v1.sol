@@ -37,6 +37,7 @@ contract BTtokens_v1 is
     error BTtokens__EngineIsNotPaused();
     error BTtokens__EngineIsPaused();
     error BTtokens__OnlyEngineCanCall();
+    error BTtokens__TransfersDisabled();
 
     ///////////////////
     //     Types    ///
@@ -73,6 +74,7 @@ contract BTtokens_v1 is
         uint256 value,
         uint256 deadline
     );
+    event TransfersEnabledSet(address indexed token, bool enabled);
 
     ///////////////////
     //   Modifiers  ///
@@ -120,6 +122,14 @@ contract BTtokens_v1 is
         _;
     }
 
+    /// @dev When false, transfer / transferFrom / permitAndTransfer revert. Only owner can change via setTransfersEnabled.
+    modifier whenTransfersEnabled() {
+        if (!s_transfersEnabled) {
+            revert BTtokens__TransfersDisabled();
+        }
+        _;
+    }
+
     ///////////////////
     //   Functions  ///
     ///////////////////
@@ -160,6 +170,7 @@ contract BTtokens_v1 is
         s_symbol = tokenSymbol;
         s_decimals = tokenDecimals;
         s_initialized = true;
+        s_transfersEnabled = false;
         c_engine = BTtokensEngine_v1(s_engine);
     }
 
@@ -227,6 +238,7 @@ contract BTtokens_v1 is
     )
         external
         whenNotEnginePaused
+        whenTransfersEnabled
         notBlacklisted(owner)
         notBlacklisted(to)
         notBlacklisted(msg.sender)
@@ -311,6 +323,15 @@ contract BTtokens_v1 is
         _setAuthority(accessManager);
     }
 
+    /**
+     * @notice Enables or disables transfers (and permitAndTransfer). Only the token owner can call.
+     * @param enabled True to allow transfers, false to revert transfer / transferFrom / permitAndTransfer.
+     */
+    function setTransfersEnabled(bool enabled) external onlyOwner {
+        s_transfersEnabled = enabled;
+        emit TransfersEnabledSet(address(this), enabled);
+    }
+
     ////////   Setters functions   /////////
     ////////  Transfers functions   /////////
 
@@ -356,6 +377,7 @@ contract BTtokens_v1 is
         virtual
         override
         whenNotEnginePaused
+        whenTransfersEnabled
         notBlacklisted(msg.sender)
         notBlacklisted(from)
         notBlacklisted(to)
@@ -382,6 +404,7 @@ contract BTtokens_v1 is
         virtual
         override(ERC20Upgradeable)
         whenNotEnginePaused
+        whenTransfersEnabled
         notBlacklisted(msg.sender)
         notBlacklisted(to)
         returns (bool)
@@ -407,8 +430,11 @@ contract BTtokens_v1 is
      */
     function _authorizeUpgrade(address _newImplementation) internal virtual override onlyOwner whenEnginePaused { }
 
+    /// @dev When false, transfer/transferFrom/permitAndTransfer revert. Only owner can set via setTransfersEnabled. Added from __gap.
+    bool public s_transfersEnabled = true;
+
     /**
-     * @dev Reserved storage space to allow for layout changes in the future. uint256[50] __gap;
+     * @dev Reserved storage space. Reduced by 1 for s_transfersEnabled.
      */
-    uint256[50] __gap;
+    uint256[49] __gap;
 }
