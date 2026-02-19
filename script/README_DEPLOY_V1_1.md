@@ -258,7 +258,7 @@ Copia la dirección que imprime **Engine Proxy** (algo como `0x5FbDB2315678afecb
 **Exportar ENGINE_PROXY y ejecutar el upgrade:**
 
 ```bash
-export ENGINE_PROXY=0x...   # la dirección del Engine Proxy del paso anterior
+export ENGINE_PROXY=0x...   # sin espacio después del = (ej.: export ENGINE_PROXY=0xe7f1725E...)
 
 forge script script/UpgradeEngineToV1_1.s.sol:UpgradeEngineToV1_1 \
   --rpc-url http://localhost:8545 \
