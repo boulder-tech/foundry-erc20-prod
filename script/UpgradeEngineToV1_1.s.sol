@@ -25,12 +25,16 @@ import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/O
  *     -vvvv
  */
 contract UpgradeEngineToV1_1 is Script {
-    // Set these via environment variables or modify directly
-    address public constant ENGINE_PROXY = address(0); // TODO: Set your engine proxy address
-    address public owner; // Will be set from msg.sender or env var
+    // Set via env var ENGINE_PROXY (required). For production add to .env; for local testing export after deploy.
+    address public engineProxy;
+    address public owner;
 
     function setUp() public {
-        // Try to get owner from env, otherwise use msg.sender
+        try vm.envAddress("ENGINE_PROXY") returns (address proxy) {
+            engineProxy = proxy;
+        } catch {
+            engineProxy = address(0);
+        }
         try vm.envAddress("ENGINE_OWNER") returns (address envOwner) {
             owner = envOwner;
         } catch {
@@ -39,12 +43,12 @@ contract UpgradeEngineToV1_1 is Script {
     }
 
     function run() external {
-        require(ENGINE_PROXY != address(0), "ENGINE_PROXY must be set");
+        require(engineProxy != address(0), "ENGINE_PROXY must be set (export ENGINE_PROXY=0x... or add to .env)");
         
         console2.log("=== Engine Upgrade to v1.1 ===");
-        console2.log("Engine Proxy:", ENGINE_PROXY);
+        console2.log("Engine Proxy:", engineProxy);
         console2.log("Owner:", owner);
-        console2.log("Current version:", EngineV1_0(ENGINE_PROXY).getVersion());
+        console2.log("Current version:", EngineV1_0(engineProxy).getVersion());
 
         vm.startBroadcast(owner);
 
@@ -57,7 +61,7 @@ contract UpgradeEngineToV1_1 is Script {
         console2.log("NOTE: Verify this contract on BaseScan after deployment");
 
         // 2. Verify current state
-        EngineV1_0 engine = EngineV1_0(ENGINE_PROXY);
+        EngineV1_0 engine = EngineV1_0(engineProxy);
         require(engine.owner() == owner, "Caller is not the owner");
         require(!engine.isEnginePaused(), "Engine is already paused");
         console2.log("\n2. Current state verified");
@@ -74,7 +78,7 @@ contract UpgradeEngineToV1_1 is Script {
         console2.log("Upgrade transaction sent");
 
         // 5. Verify upgrade
-        EngineV1_1 engineV1_1 = EngineV1_1(ENGINE_PROXY);
+        EngineV1_1 engineV1_1 = EngineV1_1(engineProxy);
         require(keccak256(bytes(engineV1_1.getVersion())) == keccak256(bytes("1.1")), "Version mismatch");
         console2.log("Version after upgrade:", engineV1_1.getVersion());
 

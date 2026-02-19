@@ -9,13 +9,14 @@ Este documento describe el proceso completo para deployar y hacer upgrade de los
    BASE_SEPOLIA_RPC_URL=https://sepolia.base.org
    BASESCAN_API_KEY=tu_api_key_de_basescan
    PRIVATE_KEY=tu_private_key_del_owner
-   ENGINE_OWNER=0x...  # Opcional: dirección del owner del engine
+   ENGINE_PROXY=0x...   # Dirección del proxy del engine (v1.0 para upgrade; obligatoria para el script de upgrade)
+   ENGINE_OWNER=0x...  # Opcional: dirección del owner del engine (por defecto la clave que firma)
    TOKEN_OWNER=0x...   # Opcional: dirección del owner del token (para upgrades)
    ```
 
 2. **Direcciones de contratos existentes** (si ya están deployados):
-   - `ENGINE_PROXY`: Dirección del proxy del engine v1.0
-   - `TOKEN_PROXY`: Dirección del proxy del token v1.0 (para upgrades)
+   - `ENGINE_PROXY`: obligatoria para el script de upgrade del engine (env o .env)
+   - `TOKEN_PROXY`: dirección del proxy del token v1.0 para upgrades de tokens
 
 ## Flujo de Upgrade (v1.0 → v1.1)
 
@@ -23,9 +24,9 @@ Este documento describe el proceso completo para deployar y hacer upgrade de los
 
 **IMPORTANTE**: El engine debe estar desplegado y funcionando en v1.0.
 
-1. Editar `script/UpgradeEngineToV1_1.s.sol` y establecer `ENGINE_PROXY`:
-   ```solidity
-   address public constant ENGINE_PROXY = 0x...; // Tu dirección del engine proxy
+1. Definir la dirección del engine proxy (en `.env` o exportar):
+   ```bash
+   export ENGINE_PROXY=0x...   # tu dirección del engine proxy v1.0
    ```
 
 2. Ejecutar el script:
@@ -225,20 +226,47 @@ Después de completar todos los pasos, verifica:
 
 ## Testing Local
 
-Antes de deployar en Base Sepolia, puedes probar localmente:
+Antes de deployar en Base Sepolia, puedes probar localmente.
+
+### 1. Tests de upgrade (sin Anvil)
 
 ```bash
-# Ejecutar tests de upgrade
 forge test --match-contract "UpgradeV1_0_to_V1_1" -vvv
+```
 
-# Simular deploy en Anvil
+### 2. Simular upgrade en Anvil (deploy v1.0 + upgrade a v1.1)
+
+El script de upgrade requiere que **ENGINE_PROXY** esté definido (variable de entorno). En local primero debes desplegar e inicializar el engine v1.0, luego exportar esa dirección y ejecutar el upgrade.
+
+**Terminal 1 – levantar Anvil:**
+
+```bash
 anvil
-# En otra terminal:
+```
+
+**Terminal 2 – desplegar e inicializar engine v1.0:**
+
+```bash
+forge script script/DeployAndInitEngine.s.sol:DeployAndInitEngine \
+  --rpc-url http://localhost:8545 \
+  --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+  --broadcast
+```
+
+Copia la dirección que imprime **Engine Proxy** (algo como `0x5FbDB2315678afecb367f032d93F642f64180aa3`).
+
+**Exportar ENGINE_PROXY y ejecutar el upgrade:**
+
+```bash
+export ENGINE_PROXY=0x...   # la dirección del Engine Proxy del paso anterior
+
 forge script script/UpgradeEngineToV1_1.s.sol:UpgradeEngineToV1_1 \
   --rpc-url http://localhost:8545 \
   --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
   --broadcast
 ```
+
+Si no defines `ENGINE_PROXY`, el script falla con: `ENGINE_PROXY must be set (export ENGINE_PROXY=0x... or add to .env)`.
 
 ## Referencias
 
