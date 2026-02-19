@@ -26,13 +26,21 @@ import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/O
  *     -vvvv
  */
 contract UpgradeTokenToV1_1 is Script {
-    // Set these via environment variables or modify directly
-    address public constant TOKEN_PROXY = address(0); // TODO: Set your token proxy address
-    address public constant ENGINE_PROXY = address(0); // TODO: Set your engine proxy address
-    address public tokenOwner; // Will be set from msg.sender or env var
+    address public tokenProxy;
+    address public engineProxy;
+    address public tokenOwner;
 
     function setUp() public {
-        // Try to get owner from env, otherwise use msg.sender
+        try vm.envAddress("TOKEN_PROXY") returns (address proxy) {
+            tokenProxy = proxy;
+        } catch {
+            tokenProxy = address(0);
+        }
+        try vm.envAddress("ENGINE_PROXY") returns (address proxy) {
+            engineProxy = proxy;
+        } catch {
+            engineProxy = address(0);
+        }
         try vm.envAddress("TOKEN_OWNER") returns (address envOwner) {
             tokenOwner = envOwner;
         } catch {
@@ -41,19 +49,19 @@ contract UpgradeTokenToV1_1 is Script {
     }
 
     function run() external {
-        require(TOKEN_PROXY != address(0), "TOKEN_PROXY must be set");
-        require(ENGINE_PROXY != address(0), "ENGINE_PROXY must be set");
+        require(tokenProxy != address(0), "TOKEN_PROXY must be set (export TOKEN_PROXY=0x...)");
+        require(engineProxy != address(0), "ENGINE_PROXY must be set (export ENGINE_PROXY=0x...)");
         
         console2.log("=== Token Upgrade to v1.1 ===");
-        console2.log("Token Proxy:", TOKEN_PROXY);
-        console2.log("Engine Proxy:", ENGINE_PROXY);
+        console2.log("Token Proxy:", tokenProxy);
+        console2.log("Engine Proxy:", engineProxy);
         console2.log("Token Owner:", tokenOwner);
-        console2.log("Current version:", TokenV1_0(TOKEN_PROXY).getVersion());
+        console2.log("Current version:", TokenV1_0(tokenProxy).getVersion());
 
         vm.startBroadcast(tokenOwner);
 
         // 1. Verify engine is v1.1
-        BTtokensEngine_v1 engine = BTtokensEngine_v1(ENGINE_PROXY);
+        BTtokensEngine_v1 engine = BTtokensEngine_v1(engineProxy);
         require(keccak256(bytes(engine.getVersion())) == keccak256(bytes("1.1")), "Engine must be v1.1");
         console2.log("\n1. Engine version verified:", engine.getVersion());
 
@@ -63,7 +71,7 @@ contract UpgradeTokenToV1_1 is Script {
         console2.log("Token v1.1 Implementation:", tokenV1_1Implementation);
 
         // 3. Verify token owner
-        TokenV1_0 token = TokenV1_0(TOKEN_PROXY);
+        TokenV1_0 token = TokenV1_0(tokenProxy);
         require(token.owner() == tokenOwner, "Caller is not the token owner");
         console2.log("\n2. Token ownership verified");
 
@@ -85,7 +93,7 @@ contract UpgradeTokenToV1_1 is Script {
         console2.log("Upgrade transaction sent");
 
         // 6. Verify upgrade
-        TokenV1_1 tokenV1_1 = TokenV1_1(TOKEN_PROXY);
+        TokenV1_1 tokenV1_1 = TokenV1_1(tokenProxy);
         require(keccak256(bytes(tokenV1_1.getVersion())) == keccak256(bytes("1.1")), "Version mismatch");
         console2.log("Version after upgrade:", tokenV1_1.getVersion());
 

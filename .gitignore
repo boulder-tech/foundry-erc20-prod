@@ -132,6 +132,8 @@ dist
 # Foundry
 cache/
 out/
+broadcast/
+anvil-state.json
 
 # lib
 lib/

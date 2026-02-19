@@ -4,19 +4,18 @@ Este documento describe el proceso completo para deployar y hacer upgrade de los
 
 ## Prerequisitos
 
-1. **Variables de entorno** (agregar a `.env`):
+1. **Variables de entorno** (agregar a `.env` para Base Sepolia; en local se pueden `export` en la terminal):
    ```bash
    BASE_SEPOLIA_RPC_URL=https://sepolia.base.org
    BASESCAN_API_KEY=tu_api_key_de_basescan
    PRIVATE_KEY=tu_private_key_del_owner
-   ENGINE_PROXY=0x...   # Dirección del proxy del engine (v1.0 para upgrade; obligatoria para el script de upgrade)
-   ENGINE_OWNER=0x...  # Opcional: dirección del owner del engine (por defecto la clave que firma)
-   TOKEN_OWNER=0x...   # Opcional: dirección del owner del token (para upgrades)
+   ENGINE_PROXY=0x...   # Proxy del engine v1.0 (obligatoria para upgrade engine y set token impl)
+   TOKEN_PROXY=0x...    # Para upgrade de tokens: dirección de cada token v1.0 (cambiar por token o exportar antes de cada run)
+   ENGINE_OWNER=0x...   # Opcional: owner del engine (por defecto la clave que firma)
+   TOKEN_OWNER=0x...    # Opcional: owner del token (para upgrades de tokens)
    ```
 
-2. **Direcciones de contratos existentes** (si ya están deployados):
-   - `ENGINE_PROXY`: obligatoria para el script de upgrade del engine (env o .env)
-   - `TOKEN_PROXY`: dirección del proxy del token v1.0 para upgrades de tokens
+2. **Mismo flujo para local y Base Sepolia**: los scripts leen `ENGINE_PROXY` y `TOKEN_PROXY` de env. En Base Sepolia ponés las direcciones en `.env`; en local hacés `export ENGINE_PROXY=0x...` (y `TOKEN_PROXY=0x...` cuando corresponda).
 
 ## Flujo de Upgrade (v1.0 → v1.1)
 
@@ -47,12 +46,9 @@ Este documento describe el proceso completo para deployar y hacer upgrade de los
 
 ### Paso 2: Deploy Token v1.1 Implementation y Configurar en Engine
 
-Después de upgradear el engine, necesitas deployar la implementación v1.1 del token y configurarla en el engine para que los nuevos tokens usen v1.1.
+Después de upgradear el engine, deployar la implementación v1.1 del token y configurarla en el engine (los nuevos tokens pasan a ser v1.1).
 
-1. Editar `script/SetTokenImplementationV1_1.s.sol` y establecer `ENGINE_PROXY`:
-   ```solidity
-   address public constant ENGINE_PROXY = 0x...; // Misma dirección del engine proxy
-   ```
+1. Tener `ENGINE_PROXY` en `.env` (ya la usaste en el Paso 1). No hace falta editar el script.
 
 2. Ejecutar el script:
    ```bash
@@ -71,13 +67,9 @@ Después de upgradear el engine, necesitas deployar la implementación v1.1 del 
 
 ### Paso 3: Upgrade de Tokens Existentes a v1.1
 
-Para cada token existente que quieras upgradear:
+Para cada token v1.0 que tengas en Base Sepolia (o en local):
 
-1. Editar `script/UpgradeTokenToV1_1.s.sol` y establecer:
-   ```solidity
-   address public constant TOKEN_PROXY = 0x...; // Dirección del token proxy
-   address public constant ENGINE_PROXY = 0x...; // Dirección del engine proxy
-   ```
+1. Definir `TOKEN_PROXY` y `ENGINE_PROXY` (en `.env` o `export`). Para varios tokens, exportar `TOKEN_PROXY` antes de cada run o poner en `.env` y cambiar entre ejecuciones.
 
 2. Ejecutar el script:
    ```bash
@@ -234,17 +226,21 @@ Antes de deployar en Base Sepolia, puedes probar localmente.
 forge test --match-contract "UpgradeV1_0_to_V1_1" -vvv
 ```
 
-### 2. Simular upgrade en Anvil (deploy v1.0 + upgrade a v1.1)
+### 2. Flujo completo en Anvil: engine v1.0 → token v1.0 → upgrade engine v1.1 → upgrade token v1.1
 
-El script de upgrade requiere que **ENGINE_PROXY** esté definido (variable de entorno). En local primero debes desplegar e inicializar el engine v1.0, luego exportar esa dirección y ejecutar el upgrade.
+Orden a seguir (todo en la misma sesión de Anvil, en otra terminal):
 
 **Terminal 1 – levantar Anvil:**
 
 ```bash
 anvil
+# Opcional: persistir estado entre sesiones
+# anvil --state anvil-state.json
 ```
 
-**Terminal 2 – desplegar e inicializar engine v1.0:**
+**Terminal 2 – ejecutar en este orden:**
+
+**Paso A – Deploy e init engine v1.0**
 
 ```bash
 forge script script/DeployAndInitEngine.s.sol:DeployAndInitEngine \
@@ -253,20 +249,55 @@ forge script script/DeployAndInitEngine.s.sol:DeployAndInitEngine \
   --broadcast
 ```
 
-Copia la dirección que imprime **Engine Proxy** (algo como `0x5FbDB2315678afecb367f032d93F642f64180aa3`).
-
-**Exportar ENGINE_PROXY y ejecutar el upgrade:**
+Copia la dirección **Engine Proxy** e exportala (sin espacio después del `=`):
 
 ```bash
-export ENGINE_PROXY=0x...   # sin espacio después del = (ej.: export ENGINE_PROXY=0xe7f1725E...)
+export ENGINE_PROXY=0x...
+```
 
+**Paso B – Crear token v1.0** (con el engine todavía en v1.0)
+
+```bash
+forge script script/CreateToken.s.sol:CreateToken \
+  --rpc-url http://localhost:8545 \
+  --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+  --broadcast
+```
+
+Copia la dirección **Token Proxy** e exportala:
+
+```bash
+export TOKEN_PROXY=0x...
+```
+
+**Paso C – Upgrade del engine a v1.1**
+
+```bash
 forge script script/UpgradeEngineToV1_1.s.sol:UpgradeEngineToV1_1 \
   --rpc-url http://localhost:8545 \
   --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
   --broadcast
 ```
 
-Si no defines `ENGINE_PROXY`, el script falla con: `ENGINE_PROXY must be set (export ENGINE_PROXY=0x... or add to .env)`.
+**Paso D – Configurar implementación del token v1.1 en el engine**
+
+```bash
+forge script script/SetTokenImplementationV1_1.s.sol:SetTokenImplementationV1_1 \
+  --rpc-url http://localhost:8545 \
+  --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+  --broadcast
+```
+
+**Paso E – Upgrade del token a v1.1** (ya tenés `ENGINE_PROXY` y `TOKEN_PROXY` exportados)
+
+```bash
+forge script script/UpgradeTokenToV1_1.s.sol:UpgradeTokenToV1_1 \
+  --rpc-url http://localhost:8545 \
+  --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+  --broadcast
+```
+
+**Resumen del flujo:** Engine v1.0 → Create token v1.0 → Upgrade engine v1.1 → Set token impl v1.1 → Upgrade token v1.1. Si no definís `ENGINE_PROXY` o `TOKEN_PROXY` cuando corresponde, el script indicará que hace falta exportarlas.
 
 ## Referencias
 

@@ -21,12 +21,15 @@ import { BTtokens_v1 } from "../src/BTContracts/v1.1/BTtokens_v1.sol";
  *     -vvvv
  */
 contract SetTokenImplementationV1_1 is Script {
-    // Set these via environment variables or modify directly
-    address public constant ENGINE_PROXY = address(0); // TODO: Set your engine proxy address
-    address public owner; // Will be set from msg.sender or env var
+    address public engineProxy;
+    address public owner;
 
     function setUp() public {
-        // Try to get owner from env, otherwise use msg.sender
+        try vm.envAddress("ENGINE_PROXY") returns (address proxy) {
+            engineProxy = proxy;
+        } catch {
+            engineProxy = address(0);
+        }
         try vm.envAddress("ENGINE_OWNER") returns (address envOwner) {
             owner = envOwner;
         } catch {
@@ -35,16 +38,16 @@ contract SetTokenImplementationV1_1 is Script {
     }
 
     function run() external {
-        require(ENGINE_PROXY != address(0), "ENGINE_PROXY must be set");
+        require(engineProxy != address(0), "ENGINE_PROXY must be set (export ENGINE_PROXY=0x...)");
         
         console2.log("=== Set Token Implementation v1.1 ===");
-        console2.log("Engine Proxy:", ENGINE_PROXY);
+        console2.log("Engine Proxy:", engineProxy);
         console2.log("Owner:", owner);
 
         vm.startBroadcast(owner);
 
         // 1. Verify engine is v1.1
-        BTtokensEngine_v1 engine = BTtokensEngine_v1(ENGINE_PROXY);
+        BTtokensEngine_v1 engine = BTtokensEngine_v1(engineProxy);
         require(keccak256(bytes(engine.getVersion())) == keccak256(bytes("1.1")), "Engine must be v1.1");
         console2.log("\n1. Engine version verified:", engine.getVersion());
 
@@ -69,7 +72,7 @@ contract SetTokenImplementationV1_1 is Script {
         console2.log("\n4. Setting new token implementation...");
         engine.setNewTokenImplementationAddress(address(tokenV1_1Implementation));
         require(engine.s_tokenImplementationAddress() == address(tokenV1_1Implementation), "Implementation not set");
-        console2.log("New token implementation set:", engine.s_tokenImplementationAddress());
+        console2.log("New token implementation set:", address(tokenV1_1Implementation));
 
         // 6. Unpause engine
         console2.log("\n5. Unpausing engine...");
